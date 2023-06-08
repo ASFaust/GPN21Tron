@@ -8,7 +8,7 @@ class TronPlayer:
         self.host = '2001:67c:20a1:232:eb97:759e:8b4a:6d0e'  # 'fe80::42d2:42e7:4090:e66'#'gpn-tron.duckdns.org'
         self.port = 4000
         # U+131A3#bug
-        self.username = "hypersonic pickle"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.username = "pineapple internet v1.0"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
         self.password = "yousorandomxd"
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port, 0, 0))
@@ -16,8 +16,7 @@ class TronPlayer:
         self.message_count = 0
         self.fun_frequency = 312
         self.directions = ["left", "right", "up", "down"]
-        self.adjacent_deltas = [np.array([-1, 0]), np.array([1, 0]), np.array([0, 1]), np.array([0, -1])]
-        np.random.shuffle(self.directions)
+        #np.random.shuffle(self.directions)
         print("connected.")
 
     def recv(self):
@@ -75,6 +74,7 @@ class TronPlayer:
 
     def get_possible_better_directions(self, board):
         # we check the number of directions we can go in after we moved
+        # dont discern between 2 and 3
         possible_directions = []
         own_pos = self.heads[self.id]
         max_free = -1
@@ -88,7 +88,8 @@ class TronPlayer:
                     lat = self.wrap(np.array(delta) + new_pos)
                     ls = board[lat[0], lat[1]]
                     if ls == -1:
-                        free_count += 1
+                        if free_count < 2: # dont discern between 2 and 3
+                            free_count += 1
                 if max_free < free_count:
                     possible_directions = [dir]
                     max_free = free_count
@@ -121,26 +122,16 @@ class TronPlayer:
             dir2, mf2 = self.get_possible_better_directions(board0)
             dir3, mf3 = self.get_possible_better_directions(self.game)
             if len(dir1) == 0:
-                if len(dir3) == 0:
-                    print("this should never run according to my thoughts")
-                    raise RuntimeError("better options returned 0 but there are options!!")
-                    # self.send(f"move|{dir0[0]}")
-                else:
-                    print("all neighbours are contested. selecting the one with better future chances")
-                    self.send(f"move|{dir3[0]}")
+                self.send(f"move|{dir3[0]}")
             elif len(dir1) == 1:
                 print("only one neighbour is not contested. preffering that.")
                 self.send(f"move|{dir1[0]}")
             else:
-                print("more than one neighbour is not contested.")
-                if len(dir2) == 0:
-                    raise RuntimeError("better options returned 0 but there are options!!")
-                    # self.send(f"move|{dir1[0]}")
-                elif len(dir2) == 1:
-                    print("one non-contested neighbour has better neighbourhood.")
+                if len(dir2) == 1:
+                    print(f"only one non-contested neighbour has better neighbourhood. it has {mf2} chances.")
                     self.send(f"move|{dir2[0]}")
                 else:
-                    print("multiple best decisions")
+                    print(f"multiple best decisions ({len(dir2)} with {mf2} chances each)")
                     self.send(f"move|{dir2[0]}")
         # self.it += 1
         # if (self.it % 5) == 0:
@@ -188,10 +179,15 @@ class TronPlayer:
             if msg[0] == "tick":
                 self.move()
             if msg[0] == "lose":
-                print("it's over.")
+                print("i lost.")
+                self.game = None
+            if msg[0] == "win":
+                print("i WON :D")
                 self.game = None
             if (self.message_count % self.fun_frequency) == 0:
                 self.send_fun()
+            if msg[0] == "error":
+                print(msg)
 
     def send_fun(self):
         self.send(f"chat|{gen()}")
