@@ -1,5 +1,6 @@
 import socket
 import numpy as np
+from concepts import gen
 
 
 class TronPlayer:
@@ -12,8 +13,11 @@ class TronPlayer:
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port, 0, 0))
         self.game = None
-        self.it = 0
-        self.directions = ["left","right","up","down"]
+        self.message_count = 0
+        self.fun_frequency = 312
+        self.directions = ["left", "right", "up", "down"]
+        self.adjacent_deltas = [np.array([-1, 0]), np.array([1, 0]), np.array([0, 1]), np.array([0, -1])]
+        np.random.shuffle(self.directions)
         print("connected.")
 
     def recv(self):
@@ -33,7 +37,7 @@ class TronPlayer:
     def join(self):
         self.send(f"join|{self.username}|{self.password}")
 
-    def send(self,msg):
+    def send(self, msg):
         self.sock.sendall((msg + "\n").encode('utf-8'))
 
     def set_game(self, msg):
@@ -41,14 +45,13 @@ class TronPlayer:
         self.game[:, :] = -1  # -1 indicates free
         self.id = int(msg[3])
         self.heads = {}
-        self.it = 0
         print(f"set game with {msg}")
 
     def update_pos(self, msg):
         player_id = int(msg[1])
         x = int(msg[2])
         y = int(msg[3])
-        self.heads[player_id] = np.array((x, y),dtype = np.int32)
+        self.heads[player_id] = np.array((x, y), dtype=np.int32)
         self.game[x, y] = player_id
 
     def someone_died(self, msg):
@@ -59,8 +62,8 @@ class TronPlayer:
             self.heads.pop(int(player_id))
 
     def get_possible_directions(self, board):
-        #returns possible directions given this board. so we can use
-        #multiple boards to eval this in case one doesnt return any dir.
+        # returns possible directions given this board. so we can use
+        # multiple boards to eval this in case one doesnt return any dir.
         possible_directions = []
         own_pos = self.heads[self.id]
         for dir in self.directions:
@@ -69,6 +72,29 @@ class TronPlayer:
             if state == -1:
                 possible_directions.append(dir)
         return possible_directions
+
+    def get_possible_better_directions(self, board):
+        # we check the number of directions we can go in after we moved
+        possible_directions = []
+        own_pos = self.heads[self.id]
+        max_free = -1
+        for dir in self.directions:
+            new_pos = self.move_(own_pos, dir)
+            state = board[new_pos[0], new_pos[1]]
+            if state == -1:
+                free_count = 0
+                # now we count the number of adjacent free cells.
+                for delta in [[-1, 0], [1, 0], [0, -1], [0, 1]]:
+                    lat = self.wrap(np.array(delta) + new_pos)
+                    ls = board[lat[0], lat[1]]
+                    if ls == -1:
+                        free_count += 1
+                if max_free < free_count:
+                    possible_directions = [dir]
+                    max_free = free_count
+                elif max_free == free_count:
+                    possible_directions.append(dir)
+        return possible_directions, max_free
 
     def next_enemy_positions(self):
         board = self.game.copy()
@@ -84,25 +110,43 @@ class TronPlayer:
         dir0 = self.get_possible_directions(self.game.copy())
         if len(dir0) == 0:
             print("it's over :<")
-            self.send("move|left") #send final move command
+            self.send("move|left")  # send final move command
             return
         elif len(dir0) == 1:
+            print("just one field possible")
             self.send(f"move|{dir0[0]}")
         else:
             board0 = self.next_enemy_positions()
             dir1 = self.get_possible_directions(board0)
+            dir2, mf2 = self.get_possible_better_directions(board0)
+            dir3, mf3 = self.get_possible_better_directions(self.game)
             if len(dir1) == 0:
-                print("all neighbours are potentially shite.")
-                self.send(f"move|{dir0[0]}")
+                if len(dir3) == 0:
+                    print("this should never run according to my thoughts")
+                    raise RuntimeError("better options returned 0 but there are options!!")
+                    # self.send(f"move|{dir0[0]}")
+                else:
+                    print("all neighbours are contested. selecting the one with better future chances")
+                    self.send(f"move|{dir3[0]}")
             elif len(dir1) == 1:
+                print("only one neighbour is not contested. preffering that.")
                 self.send(f"move|{dir1[0]}")
             else:
-                self.send(f"move|{dir1[0]}")
-        #self.it += 1
-        #if (self.it % 5) == 0:
+                print("more than one neighbour is not contested.")
+                if len(dir2) == 0:
+                    raise RuntimeError("better options returned 0 but there are options!!")
+                    # self.send(f"move|{dir1[0]}")
+                elif len(dir2) == 1:
+                    print("clear winner in driection")
+                    self.send(f"move|{dir2[0]}")
+                else:
+                    print("multiple best decisions")
+                    self.send(f"move|{dir2[0]}")
+        # self.it += 1
+        # if (self.it % 5) == 0:
         #    self.directions = self.directions[1:] + self.directions[:1]
 
-    def move_(self,pos,dir):
+    def move_(self, pos, dir):
         pos2 = pos.copy()
         if dir == "left":
             pos2[0] -= 1
@@ -125,18 +169,18 @@ class TronPlayer:
             x -= self.game.shape[0]
         while y >= self.game.shape[1]:
             y -= self.game.shape[1]
-        return np.array((x, y), dtype = np.int32)
-
+        return np.array((x, y), dtype=np.int32)
 
     def run(self):
         tp.join()
         print("joined.")
         for msg in self.recv():
+            self.message_count += 1
             if msg[0] == "game":
                 self.set_game(msg)
             if self.game is None:
                 continue
-            #-------------------------------- handling of in-game stuff: -----------------------------
+            # -------------------------------- handling of in-game stuff: -----------------------------
             if msg[0] == "pos":
                 self.update_pos(msg)
             if msg[0] == "die":
@@ -146,6 +190,12 @@ class TronPlayer:
             if msg[0] == "lose":
                 print("it's over.")
                 self.game = None
+            if (self.message_count % self.fun_frequency) == 0:
+                self.send_fun()
+
+    def send_fun(self):
+        self.send(f"chat|{gen()}")
+
 
 tp = TronPlayer()
 tp.run()
