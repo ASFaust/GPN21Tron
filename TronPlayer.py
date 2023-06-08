@@ -26,7 +26,7 @@ class TronPlayer:
             while "\n" in buffer:
                 # split the buffer at the first newline, yielding the first part
                 line, buffer = buffer.split("\n", 1)
-                print(line)
+                #print(line)
                 yield line.split("|")  # line
             # when no more newlines are in the buffer, read more data
             chunk = self.sock.recv(1024)
@@ -137,7 +137,7 @@ class TronPlayer:
                     raise RuntimeError("better options returned 0 but there are options!!")
                     # self.send(f"move|{dir1[0]}")
                 elif len(dir2) == 1:
-                    print("clear winner in driection")
+                    print("one non-contested neighbour has better neighbourhood.")
                     self.send(f"move|{dir2[0]}")
                 else:
                     print("multiple best decisions")
