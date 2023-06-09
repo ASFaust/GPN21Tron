@@ -8,15 +8,16 @@ class TronPlayer:
         self.host = '2001:67c:20a1:232:eb97:759e:8b4a:6d0e'  # 'fe80::42d2:42e7:4090:e66'#'gpn-tron.duckdns.org'
         self.port = 4000
         # U+131A3#bug
-        self.username = "pineapple internet v1.0"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.username = "pineapple internet v1.1"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
         self.password = "yousorandomxd"
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port, 0, 0))
         self.game = None
         self.message_count = 0
         self.fun_frequency = 312
+        self.max_floodfill_search_count = 20000
         self.directions = ["left", "right", "up", "down"]
-        #np.random.shuffle(self.directions)
+        # np.random.shuffle(self.directions)
         print("connected.")
 
     def recv(self):
@@ -25,7 +26,7 @@ class TronPlayer:
             while "\n" in buffer:
                 # split the buffer at the first newline, yielding the first part
                 line, buffer = buffer.split("\n", 1)
-                #print(line)
+                # print(line)
                 yield line.split("|")  # line
             # when no more newlines are in the buffer, read more data
             chunk = self.sock.recv(1024)
@@ -65,11 +66,11 @@ class TronPlayer:
         # multiple boards to eval this in case one doesnt return any dir.
         possible_directions = []
         own_pos = self.heads[self.id]
-        for dir in self.directions:
-            new_pos = self.move_(own_pos, dir)
+        for direction in self.directions:
+            new_pos = self.move_(own_pos, direction)
             state = board[new_pos[0], new_pos[1]]
             if state == -1:
-                possible_directions.append(dir)
+                possible_directions.append(direction)
         return possible_directions
 
     def get_possible_better_directions(self, board):
@@ -78,8 +79,8 @@ class TronPlayer:
         possible_directions = []
         own_pos = self.heads[self.id]
         max_free = -1
-        for dir in self.directions:
-            new_pos = self.move_(own_pos, dir)
+        for direction in self.directions:
+            new_pos = self.move_(own_pos, direction)
             state = board[new_pos[0], new_pos[1]]
             if state == -1:
                 free_count = 0
@@ -88,10 +89,10 @@ class TronPlayer:
                     lat = self.wrap(np.array(delta) + new_pos)
                     ls = board[lat[0], lat[1]]
                     if ls == -1:
-                        if free_count < 2: # dont discern between 2 and 3
+                        if free_count < 2:  # dont discern between 2 and 3
                             free_count += 1
                 if max_free < free_count:
-                    possible_directions = [dir]
+                    possible_directions = [direction]
                     max_free = free_count
                 elif max_free == free_count:
                     possible_directions.append(dir)
@@ -107,8 +108,49 @@ class TronPlayer:
                 board[new_pos[0], new_pos[1]] = player_id
         return board
 
+    def floodfill(self, board, from_positions, max_count, count):
+        next_board = board.copy()
+        next_positions = []
+        for position in from_positions:
+            for delta in [[-1, 0], [1, 0], [0, -1], [0, 1]]:
+                lat = self.wrap(np.array(delta) + position)
+                already_checked = False
+                for arr in next_positions:
+                    if np.array_equal(arr,lat):
+                        already_checked = True
+                        break
+                if already_checked:
+                    continue
+                ls = board[lat[0], lat[1]]
+                if ls == -1:
+                    next_board[lat[0], lat[1]] = self.id
+                    next_positions.append(lat)
+                    count += 1
+        if (count < max_count) and (len(next_positions) > 0):
+            return self.floodfill(next_board, next_positions, max_count, count)
+        else:
+            return count
+
+    def get_floodfill_directions(self,game):
+        own_pos = self.heads[self.id]
+        pdirs = self.get_possible_directions(game)
+        max_flood_val = -1
+        max_flood_dirs = []
+        for direction in pdirs:
+            board = game.copy()
+            next_own_pos = self.move_(own_pos,direction)
+            board[next_own_pos[0], next_own_pos[1]] = self.id
+            flood_val = self.floodfill(board, [next_own_pos], self.max_floodfill_search_count, 0)
+            if flood_val > max_flood_val:
+                max_flood_val = flood_val
+                max_flood_dirs = [direction]
+            elif flood_val == max_flood_val:
+                max_flood_dirs.append(direction)
+        print(f"best flood val: {max_flood_val}")
+        return max_flood_dirs
+
     def move(self):
-        dir0 = self.get_possible_directions(self.game.copy())
+        dir0 = self.get_possible_directions(self.game)
         if len(dir0) == 0:
             print("it's over :<")
             self.send("move|left")  # send final move command
@@ -117,35 +159,19 @@ class TronPlayer:
             print("just one field possible")
             self.send(f"move|{dir0[0]}")
         else:
-            board0 = self.next_enemy_positions()
-            dir1 = self.get_possible_directions(board0)
-            dir2, mf2 = self.get_possible_better_directions(board0)
-            dir3, mf3 = self.get_possible_better_directions(self.game)
-            if len(dir1) == 0:
-                self.send(f"move|{dir3[0]}")
-            elif len(dir1) == 1:
-                print("only one neighbour is not contested. preffering that.")
-                self.send(f"move|{dir1[0]}")
-            else:
-                if len(dir2) == 1:
-                    print(f"only one non-contested neighbour has better neighbourhood. it has {mf2} chances.")
-                    self.send(f"move|{dir2[0]}")
-                else:
-                    print(f"multiple best decisions ({len(dir2)} with {mf2} chances each)")
-                    self.send(f"move|{dir2[0]}")
-        # self.it += 1
-        # if (self.it % 5) == 0:
-        #    self.directions = self.directions[1:] + self.directions[:1]
+            dir1 = self.get_floodfill_directions()
+            self.send(f"move|{dir1[0]}")
 
-    def move_(self, pos, dir):
+
+    def move_(self, pos, direction):
         pos2 = pos.copy()
-        if dir == "left":
+        if direction == "left":
             pos2[0] -= 1
-        elif dir == "right":
+        elif direction == "right":
             pos2[0] += 1
-        elif dir == "up":
+        elif direction == "up":
             pos2[1] -= 1
-        elif dir == "down":
+        elif direction == "down":
             pos2[1] += 1
         return self.wrap(pos2)
 
