@@ -151,6 +151,33 @@ class TronPlayer:
         return max_flood_dirs, max_flood_val
 
     def move(self):
+        dir0 = self.get_possible_directions(self.game.copy())
+        if len(dir0) == 0:
+            print("it's over :<")
+            self.send("move|left")  # send final move command
+            return
+        elif len(dir0) == 1:
+            print("just one field possible")
+            self.send(f"move|{dir0[0]}")
+        else:
+            board0 = self.next_enemy_positions()
+            dir1 = self.get_possible_directions(board0)
+            dir2, mf2 = self.get_possible_better_directions(board0)
+            dir3, mf3 = self.get_possible_better_directions(self.game)
+            if len(dir1) == 0:
+                self.send(f"move|{dir3[0]}")
+            elif len(dir1) == 1:
+                print("only one neighbour is not contested. preffering that.")
+                self.send(f"move|{dir1[0]}")
+            else:
+                flood_dirs_0, floodval = self.get_floodfill_directions(self.next_enemy_positions())
+                self.send(f"move|{flood_dirs_0[0]}")
+
+        # self.it += 1
+        # if (self.it % 5) == 0:
+        #    self.directions = self.directions[1:] + self.directions[:1]
+    """
+    def move(self):
         dir0 = self.get_possible_directions(self.game)
         if len(dir0) == 0:
             print("it's over :<")
@@ -167,7 +194,7 @@ class TronPlayer:
                 print("reeval")
                 flood_dirs_1,_ = self.get_floodfill_directions(self.game)
                 self.send(f"move|{flood_dirs_1[0]}")
-
+    """
     def move_(self, pos, direction):
         pos2 = pos.copy()
         if direction == "left":
