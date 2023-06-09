@@ -5,10 +5,10 @@ from concepts import gen
 
 class TronPlayer:
     def __init__(self):
-        self.host = '2001:67c:20a1:232:eb97:759e:8b4a:6d0e'  # 'fe80::42d2:42e7:4090:e66'#'gpn-tron.duckdns.org'
+        self.host = '2001:67c:20a1:232:c5bb:64f8:b45f:9c38' #'2001:67c:20a1:232:eb97:759e:8b4a:6d0e'  # 'fe80::42d2:42e7:4090:e66'#'gpn-tron.duckdns.org'
         self.port = 4000
         # U+131A3#bug
-        self.username = "pineapple internet v1.1"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.username = "pineapple internet v1.2"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
         self.password = "yousorandomxd"
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port, 0, 0))
@@ -38,6 +38,7 @@ class TronPlayer:
         self.send(f"join|{self.username}|{self.password}")
 
     def send(self, msg):
+        print(msg)
         self.sock.sendall((msg + "\n").encode('utf-8'))
 
     def set_game(self, msg):
@@ -116,7 +117,7 @@ class TronPlayer:
                 lat = self.wrap(np.array(delta) + position)
                 already_checked = False
                 for arr in next_positions:
-                    if np.array_equal(arr,lat):
+                    if np.array_equal(arr, lat):
                         already_checked = True
                         break
                 if already_checked:
@@ -131,14 +132,14 @@ class TronPlayer:
         else:
             return count
 
-    def get_floodfill_directions(self,game):
+    def get_floodfill_directions(self, game):
         own_pos = self.heads[self.id]
         pdirs = self.get_possible_directions(game)
         max_flood_val = -1
         max_flood_dirs = []
         for direction in pdirs:
             board = game.copy()
-            next_own_pos = self.move_(own_pos,direction)
+            next_own_pos = self.move_(own_pos, direction)
             board[next_own_pos[0], next_own_pos[1]] = self.id
             flood_val = self.floodfill(board, [next_own_pos], self.max_floodfill_search_count, 0)
             if flood_val > max_flood_val:
@@ -147,7 +148,7 @@ class TronPlayer:
             elif flood_val == max_flood_val:
                 max_flood_dirs.append(direction)
         print(f"best flood val: {max_flood_val}")
-        return max_flood_dirs
+        return max_flood_dirs, max_flood_val
 
     def move(self):
         dir0 = self.get_possible_directions(self.game)
@@ -159,9 +160,13 @@ class TronPlayer:
             print("just one field possible")
             self.send(f"move|{dir0[0]}")
         else:
-            dir1 = self.get_floodfill_directions()
-            self.send(f"move|{dir1[0]}")
-
+            flood_dirs_0, floodval = self.get_floodfill_directions(self.next_enemy_positions())
+            if (len(flood_dirs_0) > 0) and (floodval > 1):
+                self.send(f"move|{flood_dirs_0[0]}")
+            else:
+                print("reeval")
+                flood_dirs_1,_ = self.get_floodfill_directions(self.game)
+                self.send(f"move|{flood_dirs_1[0]}")
 
     def move_(self, pos, direction):
         pos2 = pos.copy()
