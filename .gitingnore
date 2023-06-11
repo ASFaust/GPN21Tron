@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyCharm settings
+/.idea/
+
+# PyCharm project files
+*.iml
+*.iws
+
+# Virtual environment
+venv/
+
+# Build output
+build/
+
+# Distribution / packaging
+dist/
+*.egg-info/
+*.egg
+
+# CMake build directory
+CMakeFiles/
+
+# Compiled extension module
+*.so
+*.pyd
+
+# Compiler generated files
+*.o
+*.obj
+*.cmake
+
+# Miscellaneous
+*.swp
+*~
