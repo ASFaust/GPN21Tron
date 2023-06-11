@@ -106,58 +106,6 @@ string TronAI::get_move(){
         }
     }
 }
-/*
-string TronAI::get_move(){
-    if (this->listener->dead){
-        cout << "listener dead" << endl;
-        return "left";
-    }
-    //get the possible directions
-    vector<vec> possible_directions = this->listener->players[this->listener->player_id]->get_possible_moves();
-    if (possible_directions.size() == 0){
-        cout << "no possible directions" << endl;
-        return "left";
-    }
-    if (possible_directions.size() == 1){
-        cout << "only one possible direction" << endl;
-        return vec2String(possible_directions[0]);
-    }
-    int max_score = 0;
-
-    int max_score_index = 0;
-    int** board_copy = get_board_copy();
-    map<int, Player*> *player_copies = get_player_copy(board_copy);
-    for(int i = 0; i < possible_directions.size(); i++){
-        int score = 0;
-        for(int j = 0; j < n_samples; j++){
-            board_copy = reset_board_copy(board_copy);
-            player_copies = reset_player_copy(player_copies);
-            TronSimulator simulator(
-                board_copy,
-                listener->width, listener->height,
-                n_steps,
-                player_copies,
-                this->listener->player_id,
-                possible_directions[i]);
-            score += simulator.simulate();
-        }
-        cout << "score for direction " << vec2String(possible_directions[i]) << " is " << score << endl;
-        if (score > max_score){
-            max_score = score;
-            max_score_index = i;
-        }
-    }
-    for(map<int, Player*>::iterator it = player_copies->begin(); it != player_copies->end(); it++){
-        delete it->second;
-    }
-    delete player_copies;
-    for(int i = 0; i < this->listener->height; i++){
-        delete [] board_copy[i];
-    }
-    delete [] board_copy;
-    return vec2String(possible_directions[max_score_index]);
-}
-*/
 
 vec TronAI::sample_games(vector<vec> possible_moves){
     int max_score = 0;
