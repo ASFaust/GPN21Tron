@@ -2,7 +2,7 @@
 A bot for the GPN21 Tron Racer game.
 
 The game viewer was accessible at
-https://gpn-tron.duckdns.org/:3000/ but is now offline.
+https://gpn-tron.duckdns.org:3000 but is now offline.
 
 The code for the server side is available at
 https://github.com/freehuntx/gpn-tron
