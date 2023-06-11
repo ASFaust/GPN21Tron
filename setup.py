@@ -7,10 +7,14 @@ __version__ = "0.0.1"
 
 ext_modules = [
     Pybind11Extension(
-        'TronGame',
+        'TronGamer',
         [
             'src/pybind_tron.cpp',
-            'src/TronGame.cpp'
+            'src/TronListener.cpp',
+            'src/TronAI.cpp',
+            'src/Player.cpp',
+            'src/TronSimulator.cpp',
+            'src/vec.cpp'
         ],
         include_dirs=[
             "include/"
@@ -21,12 +25,12 @@ ext_modules = [
 ]
 
 setup(
-    name="TronGame",
+    name="TronGamer",
     version=__version__,
     author="Andreas Faust",
     author_email="andreas.s.faust@gmail.com",
     url="",
-    description="TronGame",
+    description="TronGamer",
     long_description="",
     ext_modules=ext_modules,
     extras_require={"test": "pytest"},

@@ -1,22 +1,19 @@
 import socket
 import numpy as np
-from concepts import gen
-from TronGame import TronGame
+from TronGamer import TronListener, TronAI
+import time
 
-class TronPlayer:
+class Tron:
     def __init__(self):
-        self.host = '2001:67c:20a1:232:c5bb:64f8:b45f:9c38' #'2001:67c:20a1:232:eb97:759e:8b4a:6d0e'  # 'fe80::42d2:42e7:4090:e66'#'gpn-tron.duckdns.org'
+        self.host = 'gpn-tron.duckdns.org'
         self.port = 4000
-        self.username = "pineapple internet v1.2"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.username = "Clutch Machine"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
         self.password = "yousorandomxd"
-        self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        self.sock.connect((self.host, self.port, 0, 0))
-        self.game = None
-        self.message_count = 0
-        self.fun_frequency = 312
-        self.max_floodfill_search_count = 500
-        # np.random.shuffle(self.directions)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((self.host, self.port))
         print("connected.")
+        self.AI = TronAI(0.07,1000) #max_time (seconds), max_steps :O
+        self.listener = None
 
     def recv(self):
         buffer = ""
@@ -41,34 +38,43 @@ class TronPlayer:
 
     def set_game(self, msg):
         #width, height and self player id
-        self.game = TronGame(int(msg[1]), int(msg[2]), int(msg[3]))
-        print(f"set game with {msg}")
+        width = int(msg[1])
+        height = int(msg[2])
+        self.player_id = int(msg[3])
+        self.listener = TronListener(width, height, self.player_id)
+        self.AI.set_listener(self.listener)
 
     def update_pos(self, msg):
         player_id = int(msg[1])
         x = int(msg[2])
         y = int(msg[3])
-        self.game.update_pos(player_id, x, y)
+        self.listener.update_pos(player_id, x, y)
 
     def someone_died(self, msg):
         player_ids = msg[1:]
-        print("someone died. removing their trace.")
         for player_id in player_ids:
             player_id = int(player_id)
-            self.game.remove_player(player_id)
+            self.listener.remove_player(player_id)
 
     def move(self):
-        the_move = self.game.get_move()
+        start_time = time.time()
+        the_move = self.AI.get_move()
+        end_time = time.time()
+        print(f"moving took {end_time - start_time} seconds.")
         self.send(f"move|{the_move}")  # send final move command
 
     def run(self):
+        last_tick = time.time()
         tp.join()
         print("joined.")
         for msg in self.recv():
-            self.message_count += 1
             if msg[0] == "game":
                 self.set_game(msg)
-            if self.game is None:
+            if self.listener is None:
+                print("listener is None")
+                continue
+            if self.listener.dead:
+                print("listener is dead")
                 continue
             # -------------------------------- handling of in-game stuff: -----------------------------
             if msg[0] == "pos":
@@ -76,21 +82,18 @@ class TronPlayer:
             if msg[0] == "die":
                 self.someone_died(msg)
             if msg[0] == "tick":
+                next_tick = time.time()
+                print(f"tick took {next_tick - last_tick} seconds.")
+                last_tick = next_tick
                 self.move()
             if msg[0] == "lose":
                 print("i lost.")
-                self.game = None
+                self.listener.death()
             if msg[0] == "win":
                 print("i WON :D")
-                self.game = None
-            if (self.message_count % self.fun_frequency) == 0:
-                self.send_fun()
             if msg[0] == "error":
                 print(msg)
 
-    def send_fun(self):
-        self.send(f"chat|{gen()}")
 
-
-tp = TronPlayer()
+tp = Tron()
 tp.run()
