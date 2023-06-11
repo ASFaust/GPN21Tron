@@ -1,9 +1,13 @@
 # GPN21 Tron Racer
 A bot for the GPN21 Tron Racer game.
 
-https://gpn-tron.duckdns.org/
+The game viewer was accessible at
+https://gpn-tron.duckdns.org/:3000/ but is now offline.
 
-Uses some minmaxing.
+The code for the server side is available at
+https://github.com/freehuntx/gpn-tron
+
+This Bot uses some simple heuristics to find safe and promising moves, and then runs some minmaxing to find the best move.
 
 ## Requirements
 - Python 3.9
