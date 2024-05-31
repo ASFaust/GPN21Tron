@@ -3,6 +3,7 @@ import numpy as np
 import time
 from Game import Game
 from Controller import Controller
+import cv2
 
 class Tron:
     def __init__(self):
@@ -14,6 +15,7 @@ class Tron:
         self.sock.connect((self.host, self.port))
         print("connected.")
         self.weights = (-0.030564719524807514, 1.0051631219522386, 0.39656536679234267, 0.6173943302186865, 0.15642170918508655, 0.9554791832045848)
+        #self.weights = (0.8030745481505493, 0.33864959471144396, 0.49828087898209317, 0.08939906100425099, -0.14830573064071664, 1.2507451665305211)
         self.weights = np.array(self.weights)
         self.dead = True
 
@@ -56,12 +58,18 @@ class Tron:
 
     def someone_died(self, msg):
         self.send("chat|womp womp")
+        #we need to remove the player from the game
+        player_ids = msg[1:]
+        print("someone died. removing their trace.")
+        for player_id in player_ids:
+            self.game.board[self.game.board == int(player_id)] = -1
+            del self.game.players[int(player_id)]
 
     def move(self):
         start_time = time.time()
         move = self.controller.move(as_string=True)
         end_time = time.time()
-        print(f"moving took {end_time - start_time} seconds.")
+        #print(f"moving took {end_time - start_time} seconds.")
         self.send(f"move|{move}")  # send final move command
 
     def run(self):
@@ -69,11 +77,12 @@ class Tron:
         tp.join()
         print("joined.")
         for msg in self.recv():
-            print(msg)
+            if msg[0] == "error":
+                print(msg)
             if msg[0] == "game":
                 self.set_game(msg)
             if self.dead:
-                print("self is dead")
+                #print("self is dead")
                 continue
             # -------------------------------- handling of in-game stuff: -----------------------------
             if msg[0] == "pos":
@@ -85,6 +94,9 @@ class Tron:
                 print(f"tick took {next_tick - last_tick} seconds.")
                 last_tick = next_tick
                 self.game.update_board()
+                img = self.game.draw()
+                cv2.imshow("game", img)
+                cv2.waitKey(1)
                 self.move()
             if msg[0] == "lose":
                 print("i lost.")
@@ -92,10 +104,6 @@ class Tron:
             if msg[0] == "win":
                 print("i WON :D")
                 self.dead = True
-            if msg[0] == "error":
-                print("error:")
-                print(msg)
-
 
 tp = Tron()
 tp.run()

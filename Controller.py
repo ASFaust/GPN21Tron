@@ -15,10 +15,11 @@ class Controller:
         x,y = self.game.players[self.player_id]
         w,h = self.game.width, self.game.height
         possible_moves = []
-        moves = [(((x+1)%w,y),"right"), (((x-1+w)%w,y),"left"), ((x,(y-1)%h),"up"), ((x,(y+1+h)%h),"down")]
+        moves = [(((x+1)%w,y),"right"), (((x-1+w)%w,y),"left"), ((x,(y-1+h)%h),"up"), ((x,(y+1)%h),"down")]
         for move in moves:
             if self.game.board[move[0]] == -1:
                 possible_moves.append(move)
+        print(possible_moves)
         if len(possible_moves) == 0:
             ret = moves[0]
         elif len(possible_moves) == 1:
