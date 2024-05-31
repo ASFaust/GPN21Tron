@@ -7,7 +7,7 @@ class Tron:
     def __init__(self):
         self.host = 'gpn-tron.duckdns.org'
         self.port = 4000
-        self.username = "Clutch Machine"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.username = "Tracer 0.1"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
         self.password = "yousorandomxd"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
@@ -68,6 +68,7 @@ class Tron:
         tp.join()
         print("joined.")
         for msg in self.recv():
+            print(msg)
             if msg[0] == "game":
                 self.set_game(msg)
             if self.listener is None:
