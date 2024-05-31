@@ -1,19 +1,21 @@
 import socket
 import numpy as np
-from TronGamer import TronListener, TronAI
 import time
+from Game import Game
+from Controller import Controller
 
 class Tron:
     def __init__(self):
         self.host = 'gpn-tron.duckdns.org'
         self.port = 4000
-        self.username = "Tracer 0.1"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.username = "Enkidu 1.0"
         self.password = "yousorandomxd"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
         print("connected.")
-        self.AI = TronAI(0.07,1000) #max_time (seconds), max_steps :O
-        self.listener = None
+        self.weights = (-0.030564719524807514, 1.0051631219522386, 0.39656536679234267, 0.6173943302186865, 0.15642170918508655, 0.9554791832045848)
+        self.weights = np.array(self.weights)
+        self.dead = True
 
     def recv(self):
         buffer = ""
@@ -41,27 +43,26 @@ class Tron:
         width = int(msg[1])
         height = int(msg[2])
         self.player_id = int(msg[3])
-        self.listener = TronListener(width, height, self.player_id)
-        self.AI.set_listener(self.listener)
+        self.game = Game(width,height)
+        self.controller = Controller()
+        self.controller.init(self.game,self.player_id,self.weights)
+        self.dead = False
 
     def update_pos(self, msg):
         player_id = int(msg[1])
         x = int(msg[2])
         y = int(msg[3])
-        self.listener.update_pos(player_id, x, y)
+        self.game.update_pos(player_id,x,y)
 
     def someone_died(self, msg):
-        player_ids = msg[1:]
-        for player_id in player_ids:
-            player_id = int(player_id)
-            self.listener.remove_player(player_id)
+        self.send("chat|womp womp")
 
     def move(self):
         start_time = time.time()
-        the_move = self.AI.get_move()
+        move = self.controller.move(as_string=True)
         end_time = time.time()
         print(f"moving took {end_time - start_time} seconds.")
-        self.send(f"move|{the_move}")  # send final move command
+        self.send(f"move|{move}")  # send final move command
 
     def run(self):
         last_tick = time.time()
@@ -71,11 +72,8 @@ class Tron:
             print(msg)
             if msg[0] == "game":
                 self.set_game(msg)
-            if self.listener is None:
-                print("listener is None")
-                continue
-            if self.listener.dead:
-                print("listener is dead")
+            if self.dead:
+                print("self is dead")
                 continue
             # -------------------------------- handling of in-game stuff: -----------------------------
             if msg[0] == "pos":
@@ -86,13 +84,16 @@ class Tron:
                 next_tick = time.time()
                 print(f"tick took {next_tick - last_tick} seconds.")
                 last_tick = next_tick
+                self.game.update_board()
                 self.move()
             if msg[0] == "lose":
                 print("i lost.")
-                self.listener.death()
+                self.dead = True
             if msg[0] == "win":
                 print("i WON :D")
+                self.dead = True
             if msg[0] == "error":
+                print("error:")
                 print(msg)
 
 

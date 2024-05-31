@@ -7,9 +7,10 @@ class Game:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.board = np.ones((self.width, self.height)).astype(int) * -1
+        self.board = np.ones((self.width, self.height)).astype(np.int32) * -1
         self.players = {}
         self._color_init = False
+        self.dists = None
 
     def update_pos(self, player_id, x, y):
         self.players[player_id] = (x, y)
@@ -60,3 +61,9 @@ class Game:
         #resize to 800x800, with clearly visible pixels
         canvas = cv2.resize(canvas, (800, 800), interpolation=cv2.INTER_NEAREST)
         return canvas
+
+    def copy(self):
+        new_game = Game(self.width, self.height)
+        new_game.board = self.board.copy()
+        new_game.players = self.players.copy()
+        return new_game

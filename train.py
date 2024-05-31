@@ -2,30 +2,84 @@ from Controller import Controller
 from Game import Game
 import numpy as np
 import cv2
+import pickle
+from multiprocessing import Pool, cpu_count
 
-def simulate_world(controllers,draw=False):
+def simulate_world(weights, draw=False):
+    controllers = [Controller() for _ in range(len(weights))]
     game = Game(len(controllers)*2, len(controllers)*2)
-    for i,controller in enumerate(controllers):
-        controller.init(game,i)
+    for i, controller in enumerate(controllers):
+        controller.init(game, i, weights[i])
     fitness_counter = np.zeros(len(controllers))
 
     while len(game.players) > 1:
         if draw:
             cv2.imshow("game", game.draw())
-            cv2.waitKey(500)
-
-        for i,controller in enumerate(controllers):
+            cv2.waitKey(1)
+        new_positions = []
+        for i, controller in enumerate(controllers):
             if not i in game.players:
                 continue
-            x,y = controller.move()
+            x, y = controller.move()
+            new_positions.append((i, x, y))
+
+        for i, x, y in new_positions:  # needs to be separate loop to avoid
+            # changing the board while iterating over it
             game.update_pos(i, x, y)
         game.check_dead()
         game.update_board()
         for player in game.players.keys():
             fitness_counter[player] += 1
-    return fitness_counter #returns the number of steps each player survived
+    return fitness_counter  # returns the number of steps each player survived
+
+def get_opponents(individual_map, n_opponents):
+    # get the individuals with the lowest number of evaluations
+    individuals = list(individual_map.keys())
+    # shuffle the individuals to avoid always selecting the same ones
+    np.random.shuffle(individuals)
+    individuals = sorted(individuals, key=lambda x: len(individual_map[x]["fitness"]))
+    return individuals[:n_opponents]
+
+def evaluate_individual(opponents):
+    fitnesses = simulate_world(opponents, draw=False)
+    fitnesses = np.argsort(fitnesses)
+    fitnesses = np.argsort(fitnesses).astype(np.float32) + 1
+    fitnesses /= len(opponents)
+    return opponents, fitnesses
 
 if __name__ == "__main__":
-    controllers = [Controller() for _ in range(20)]
-    fitnesses = simulate_world(controllers,draw=True)
-    print(fitnesses)
+    n_individuals = 1000
+    n_weights = 6
+    # min_opponents = 24
+    # max_opponents = 25
+    n_evals_per_individual = 20
+    individual_map = {}
+
+    for i in range(n_individuals):
+        weights = np.random.randn(n_weights)
+        w_key = tuple(weights)
+        individual_map[w_key] = {"fitness": []}
+
+    pool = Pool(cpu_count())
+
+    while True:
+        n_opponents = 25  # np.random.randint(min_opponents, max_opponents)
+        opponents_list = [get_opponents(individual_map, n_opponents) for _ in range(cpu_count())]
+
+        results = pool.map(evaluate_individual, opponents_list)
+
+        for opponents, fitnesses in results:
+            for i, opponent in enumerate(opponents):
+                individual_map[opponent]["fitness"].append(fitnesses[i])
+
+        progress = sum(len(fss["fitness"]) for fss in individual_map.values())
+        print(f"Progress: {progress}/{n_evals_per_individual * n_individuals}")
+
+        if progress >= n_evals_per_individual * n_individuals:
+            break
+
+    pool.close()
+    pool.join()
+
+    with open("individual_map.pkl", "wb") as f:
+        pickle.dump(individual_map, f)
