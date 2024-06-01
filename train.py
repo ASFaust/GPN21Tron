@@ -5,11 +5,17 @@ import cv2
 import pickle
 from multiprocessing import Pool, cpu_count
 
+n_neurons = 8
+n_individuals = 1000
+n_weights = 12 * n_neurons
+n_evals_per_individual = 10
+n_opponents = 20
+
 def simulate_world(weights, draw=False):
     controllers = [Controller() for _ in range(len(weights))]
     game = Game(len(controllers)*2, len(controllers)*2)
     for i, controller in enumerate(controllers):
-        controller.init(game, i, weights[i])
+        controller.init(game, i, weights[i], n_neurons)
     fitness_counter = np.zeros(len(controllers))
 
     while len(game.players) > 1:
@@ -31,11 +37,11 @@ def simulate_world(weights, draw=False):
             fitness_counter[player] += 1
     return fitness_counter
 
-def get_opponents(individual_map, n_opponents):
-    eligible_individuals = [ind for ind in individual_map if len(individual_map[ind]["fitness"]) < 100]
+def get_opponents(individual_map, n_opponents=n_opponents):
+    eligible_individuals = [ind for ind in individual_map if len(individual_map[ind]["fitness"]) < n_evals_per_individual]
     np.random.shuffle(eligible_individuals)
     if len(eligible_individuals) < n_opponents:
-        eligible_individuals.extend([ind for ind in individual_map if len(individual_map[ind]["fitness"]) >= 100])
+        eligible_individuals.extend([ind for ind in individual_map if len(individual_map[ind]["fitness"]) >= n_evals_per_individual])
     return eligible_individuals[:n_opponents]
 
 def evaluate_individual(opponents):
@@ -47,9 +53,7 @@ def evaluate_individual(opponents):
     return opponents, fitnesses
 
 if __name__ == "__main__":
-    n_individuals = 4000
-    n_weights = 32
-    n_evals_per_individual = 100
+
     individual_map = {}
 
     for i in range(n_individuals):
@@ -60,8 +64,7 @@ if __name__ == "__main__":
     pool = Pool(cpu_count())
 
     while any(len(fss["fitness"]) < n_evals_per_individual for fss in individual_map.values()):
-        n_opponents = 20
-        opponents_list = [get_opponents(individual_map, n_opponents) for _ in range(cpu_count())]
+        opponents_list = [get_opponents(individual_map) for _ in range(cpu_count())]
 
         results = pool.map(evaluate_individual, opponents_list)
 

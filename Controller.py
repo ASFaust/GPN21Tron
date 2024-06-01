@@ -4,12 +4,16 @@ from TronAlgos import flood_fill, distances
 class Controller:
     def __init__(self):
         pass
-    def init(self, game, player_id, weights):
+    def init(self, game, player_id, weights, n_neurons):
         self.game = game
         self.player_id = player_id
         self.game.update_pos(player_id, player_id * 2, player_id * 2)
         self.game.update_board()
         self.weights = np.array(weights)
+        self.n_neurons = n_neurons
+        self.delta_2 = [(x,y) for x in range(-2,3) for y in range(-2,3) if abs(x) + abs(y) == 2]
+        self.delta_3 = [(x,y) for x in range(-3,4) for y in range(-3,4) if abs(x) + abs(y) == 3]
+        self.delta_4 = [(x,y) for x in range(-4,5) for y in range(-4,5) if abs(x) + abs(y) == 4]
 
     def move(self,as_string=False):
         x,y = self.game.players[self.player_id]
@@ -28,6 +32,7 @@ class Controller:
             max_score = np.max(move_scores)
             best_moves = [possible_moves[i] for i in range(len(possible_moves)) if move_scores[i] == max_score]
             ret = best_moves[np.random.randint(0, len(best_moves))]
+            #ret = best_moves[0]
         if as_string:
             return ret[1]
         else:
@@ -41,20 +46,22 @@ class Controller:
         a list of scores for each move
         """
         score_01 = self.score_count_empty(possible_moves,[[-1,0],[1,0],[0,-1],[0,1]]) * 4/3 #4/3 is the maximum score possible
-        score_02 = self.score_dist_enemy(possible_moves)
-        score_03 = self.score_count_empty(possible_moves,[(x,y) for x in range(-2,3) for y in range(-2,3) if abs(x) + abs(y) == 2])
-        score_04 = self.score_count_empty(possible_moves,[(x,y) for x in range(-3,4) for y in range(-3,4) if abs(x) + abs(y) == 3])
-        score_05 = self.score_flood_fill(possible_moves)
-        score_06 = self.score_best_distance(possible_moves)
-        sum_scores = np.array([score_01,score_02,score_03,score_04,score_05,score_06]).T
+        score_02 = self.score_contested(possible_moves)
+        score_03 = self.score_count_empty(possible_moves,self.delta_2)
+        score_04 = self.score_count_empty(possible_moves,self.delta_3)
+        score_05 = self.score_count_empty(possible_moves,self.delta_4)
+        score_06 = self.score_flood_fill(possible_moves)
+        score_07 = self.score_best_distance(possible_moves)
+        score_08,score_09 = self.score_enemy_distance(possible_moves)
+        sum_scores = np.array([score_01,score_02,score_03,score_04,score_05,score_06,score_07,score_08,score_09]).T
         final_scores = []
         for i in range(sum_scores.shape[0]):
             scores = sum_scores[i] #scores is a 6-element array
-            w1 = self.weights[0:24].reshape(6,4)
-            b1 = self.weights[24:28]
+            w1 = self.weights[0:9*self.n_neurons].reshape(9,self.n_neurons)
+            b1 = self.weights[9*self.n_neurons:10*self.n_neurons]
             h1 = np.dot(scores,w1) + b1
             h1[h1<0] = 0
-            w2 = self.weights[28:32]
+            w2 = self.weights[11*self.n_neurons:12*self.n_neurons]
             h2 = np.dot(h1,w2)
             final_scores.append(h2)
 
@@ -78,17 +85,15 @@ class Controller:
             scores.append(empty_fields)
         return np.array(scores) / len(deltas)
 
-    def score_dist_enemy(self, possible_moves):
+    def score_contested(self, possible_moves):
         """
-        This score function returns for each move the distance to the nearest player, using the Manhattan distance.
-        Considering the wrap-around property of the torus.
+        This score function returns for each move wether an enemy player can move onto the same move
         :param possible_moves:
         :return:
         """
         scores = []
         for move in possible_moves:
             x, y = move[0]
-            distances = [100]
             for player_id, (player_x, player_y) in self.game.players.items():
                 if player_id == self.player_id:
                     continue
@@ -96,17 +101,11 @@ class Controller:
                 dx = min(abs(x - player_x), self.game.width - abs(x - player_x))
                 dy = min(abs(y - player_y), self.game.height - abs(y - player_y))
                 distance = dx + dy
-                distances.append(distance)
-
-            # Use the minimum distance for the score
-            min_distance = np.min(distances)
-            # Transform the distance to be between 0 and 1
-            # Using a logarithmic transformation with a base +1 to handle distances of 0
-            if min_distance < 1:
-                raise ValueError("Distance should be at least 1")
-            score = 1.0 - 1 / min_distance  # Inverse transformation, higher distance is less significant
-            scores.append(score)
-
+                if distance == 1:
+                    scores.append(0)
+                    break
+            else:
+                scores.append(1)
         return np.array(scores)
 
     def score_flood_fill(self, possible_moves):
@@ -140,3 +139,26 @@ class Controller:
             scores.append(len(dists[dists != const_far_away]))
         scores = np.array(scores)
         return scores / max(scores.max(),1)
+
+    def score_enemy_distance(self, possible_moves):
+        scores = []
+        const_far_away = 1000000
+
+        for move in possible_moves:
+            x, y = move[0]
+            board = self.game.board.copy()
+            dists = distances(board, x, y)
+            dists[dists == -1] = const_far_away
+            min_dist = const_far_away
+            for player_id, (player_x, player_y) in self.game.players.items():
+                if player_id == self.player_id:
+                    continue
+                dist = dists[player_x, player_y]
+                if dist < min_dist:
+                    min_dist = dist
+            if min_dist == const_far_away:
+                scores.append(1.0)
+            else:
+                scores.append(1.0 - 1.0 / min_dist)
+        scores = np.array(scores)
+        return scores, scores / max(scores.max(),1)

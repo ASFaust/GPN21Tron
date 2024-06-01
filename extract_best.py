@@ -14,7 +14,7 @@ def aggregate_fitness(fitness_list, method):
     else:
         raise ValueError("Unsupported aggregation method: choose 'mean', 'max', or 'min'")
 
-def get_top_n_individuals(individual_map, n=1, aggregation_method='number_of_wins'):
+def get_top_n_individuals(individual_map, n=1, aggregation_method='mean'):
     ind_keys = list(individual_map.keys())
 
     ind_agg_fitness = []
@@ -35,14 +35,14 @@ def get_top_n_individuals(individual_map, n=1, aggregation_method='number_of_win
 if __name__ == "__main__":
 
     # Load the individual map
-    #with open("individual_map.pkl", "rb") as f:
-    #    individual_map = pickle.load(f)
-    with open("refined.pkl", "rb") as f:
+    with open("individual_map.pkl", "rb") as f:
         individual_map = pickle.load(f)
+    #with open("refined.pkl", "rb") as f:
+    #    individual_map = pickle.load(f)
 
     # Parameters
     n = 10  # Number of top individuals to retrieve
-    aggregation_method = 'number_of_wins'  # Aggregation method: 'mean', 'max', or 'min'
+    aggregation_method = 'mean'  # Aggregation method: 'mean', 'max', or 'min'
 
     # Get top n individuals
     top_individuals, top_fitnesses = get_top_n_individuals(individual_map, n, aggregation_method)
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     fitness_array = []
     for key in individual_map.keys():
-        fitness_array.append(individual_map[key]["fitness"][:19])
+        fitness_array.append(individual_map[key]["fitness"][:9])
 
     fitness_array = np.array(fitness_array)
 
