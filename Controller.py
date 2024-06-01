@@ -19,7 +19,6 @@ class Controller:
         for move in moves:
             if self.game.board[move[0]] == -1:
                 possible_moves.append(move)
-        print(possible_moves)
         if len(possible_moves) == 0:
             ret = moves[0]
         elif len(possible_moves) == 1:

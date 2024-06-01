@@ -9,13 +9,14 @@ class Tron:
     def __init__(self):
         self.host = 'gpn-tron.duckdns.org'
         self.port = 4000
-        self.username = "Enkidu 1.0"
+        self.username = "Chocolate Starfish"
         self.password = "yousorandomxd"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
         print("connected.")
-        self.weights = (-0.030564719524807514, 1.0051631219522386, 0.39656536679234267, 0.6173943302186865, 0.15642170918508655, 0.9554791832045848)
+        #self.weights = (-0.030564719524807514, 1.0051631219522386, 0.39656536679234267, 0.6173943302186865, 0.15642170918508655, 0.9554791832045848)
         #self.weights = (0.8030745481505493, 0.33864959471144396, 0.49828087898209317, 0.08939906100425099, -0.14830573064071664, 1.2507451665305211)
+        self.weights = (-0.0270007979079513, 0.828252131131214, 0.5039031305967274, 0.16356345117206306, 0.15951748736838017, 0.8628544581024385)
         self.weights = np.array(self.weights)
         self.dead = True
 

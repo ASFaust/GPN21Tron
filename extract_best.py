@@ -12,7 +12,6 @@ def aggregate_fitness(fitness_list, method):
     else:
         raise ValueError("Unsupported aggregation method: choose 'mean', 'max', or 'min'")
 
-
 def get_top_n_individuals(individual_map, n=1, aggregation_method='mean'):
     ind_keys = list(individual_map.keys())
 
@@ -31,47 +30,50 @@ def get_top_n_individuals(individual_map, n=1, aggregation_method='mean'):
 
     return top_n_individuals, top_n_fitnesses
 
+if __name__ == "__main__":
 
-# Load the individual map
-with open("individual_map.pkl", "rb") as f:
-    individual_map = pickle.load(f)
+    # Load the individual map
+    #with open("individual_map.pkl", "rb") as f:
+    #    individual_map = pickle.load(f)
+    with open("refined.pkl", "rb") as f:
+        individual_map = pickle.load(f)
 
-# Parameters
-n = 3  # Number of top individuals to retrieve
-aggregation_method = 'mean'  # Aggregation method: 'mean', 'max', or 'min'
+    # Parameters
+    n = 3  # Number of top individuals to retrieve
+    aggregation_method = 'mean'  # Aggregation method: 'mean', 'max', or 'min'
 
-# Get top n individuals
-top_individuals, top_fitnesses = get_top_n_individuals(individual_map, n, aggregation_method)
+    # Get top n individuals
+    top_individuals, top_fitnesses = get_top_n_individuals(individual_map, n, aggregation_method)
 
-for i in range(n):
-    print(f"Individual {i + 1}: {top_individuals[i]} with {aggregation_method} fitness: {top_fitnesses[i]}")
+    for i in range(n):
+        print(f"Individual {i + 1}: {top_individuals[i]} with {aggregation_method} fitness: {top_fitnesses[i]}")
 
 
-fitness_array = []
-for key in individual_map.keys():
-    fitness_array.append(individual_map[key]["fitness"][:19])
+    fitness_array = []
+    for key in individual_map.keys():
+        fitness_array.append(individual_map[key]["fitness"][:19])
 
-fitness_array = np.array(fitness_array)
+    fitness_array = np.array(fitness_array)
 
-print(fitness_array)
+    print(fitness_array)
 
-#sort fitness array by mean fitness
-mean_fitness = np.mean(fitness_array, axis=1)
-sorted_indices = np.argsort(mean_fitness)[::-1]
-fitness_array = fitness_array[sorted_indices]
+    #sort fitness array by mean fitness
+    mean_fitness = np.mean(fitness_array, axis=1)
+    sorted_indices = np.argsort(mean_fitness)[::-1]
+    fitness_array = fitness_array[sorted_indices]
 
-#plot the fitness array: scatter indices vs fitness values
-means = fitness_array.mean(axis=1)
-std_devs = fitness_array.std(axis=1)
+    #plot the fitness array: scatter indices vs fitness values
+    means = fitness_array.mean(axis=1)
+    std_devs = fitness_array.std(axis=1)
 
-# Create a range for the x-axis
-x = range(len(fitness_array))
+    # Create a range for the x-axis
+    x = range(len(fitness_array))
 
-# Plot the means with error bars
-plt.errorbar(x, means, yerr=std_devs, fmt='o', ecolor='red', capsize=5, capthick=1, marker='o', linestyle='None')
+    # Plot the means with error bars
+    plt.errorbar(x, means, yerr=std_devs, fmt='o', ecolor='red', capsize=5, capthick=1, marker='o', linestyle='None')
 
-# Display the plot
-plt.xlabel('Index')
-plt.ylabel('Mean Fitness')
-plt.title('Mean Fitness with Standard Deviation')
-plt.show()
+    # Display the plot
+    plt.xlabel('Index')
+    plt.ylabel('Mean Fitness')
+    plt.title('Mean Fitness with Standard Deviation')
+    plt.show()
