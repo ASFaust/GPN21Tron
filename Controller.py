@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from TronAlgos import flood_fill, distances
 
 class Controller:
@@ -53,15 +54,16 @@ class Controller:
         score_06 = self.score_flood_fill(possible_moves)
         score_07 = self.score_best_distance(possible_moves)
         score_08,score_09 = self.score_enemy_distance(possible_moves)
-        sum_scores = np.array([score_01,score_02,score_03,score_04,score_05,score_06,score_07,score_08,score_09]).T
+        score_10 = self.score_dilated_flood_fill(possible_moves)
+        sum_scores = np.array([score_01,score_02,score_03,score_04,score_05,score_06,score_07,score_08,score_09,score_10]).T
         final_scores = []
         for i in range(sum_scores.shape[0]):
             scores = sum_scores[i] #scores is a 6-element array
-            w1 = self.weights[0:9*self.n_neurons].reshape(9,self.n_neurons)
-            b1 = self.weights[9*self.n_neurons:10*self.n_neurons]
+            w1 = self.weights[0:10*self.n_neurons].reshape(10,self.n_neurons)
+            b1 = self.weights[10*self.n_neurons:11*self.n_neurons]
             h1 = np.dot(scores,w1) + b1
             h1 = np.sin(h1)
-            w2 = self.weights[11*self.n_neurons:12*self.n_neurons]
+            w2 = self.weights[12*self.n_neurons:13*self.n_neurons]
             h2 = np.dot(h1,w2)
             final_scores.append(h2)
 
@@ -122,6 +124,22 @@ class Controller:
         scores = np.array(scores)
         return scores / max(scores.max(),1)
 
+    def score_dilated_flood_fill(self, possible_moves):
+        #dilate the walls by 1 field. be careful with the starting position, don't fill it.
+        scores = []
+        for move in possible_moves:
+            x, y = move[0]
+            board = self.game.board.copy()
+            board[board != -1] = 1
+            board[board == -1] = 0
+            board = cv2.dilate(board.astype(np.uint8), np.ones((3,3),np.uint8), iterations=1)
+            board[x,y] = 0
+            board[board == 0] = -1
+            board = board.astype(np.int32)
+            scores.append(flood_fill(board, x, y))
+        scores = np.array(scores)
+        return scores / max(scores.max(),1)
+
     def score_best_distance(self, possible_moves):
         scores = []
         const_far_away = 1000000
@@ -162,3 +180,21 @@ class Controller:
                 scores.append(1.0 - 1.0 / min_dist)
         scores = np.array(scores)
         return scores, scores / max(scores.max(),1)
+
+    def best_distance_move(self,possible_moves):
+        scores = []
+        const_far_away = 1000000
+        for move in possible_moves:
+            x, y = move[0]
+            board = self.game.board.copy()
+            dists = distances(board, x, y)
+            dists[dists == -1] = const_far_away
+            for player_id, (player_x, player_y) in self.game.players.items():
+                if player_id == self.player_id:
+                    continue
+                player_dists = distances(board, player_x, player_y) - 1 #-1 because we already did a move.
+                player_dists[player_dists == -2] = const_far_away
+                dists[player_dists < dists] = const_far_away
+            scores.append(len(dists[dists != const_far_away]))
+        scores = np.array(scores)
+        return scores / max(scores.max(),1)

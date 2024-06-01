@@ -7,8 +7,8 @@ from multiprocessing import Pool, cpu_count
 
 n_neurons = 8
 n_individuals = 2000
-n_weights = 12 * n_neurons
-n_evals_per_individual = 10
+n_weights = 13 * n_neurons
+n_evals_per_individual = 20
 n_opponents = 20
 
 def simulate_world(weights, draw=False):
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     individual_map = {}
 
     for i in range(n_individuals):
-        weights = np.random.randn(n_weights)
+        weights = np.random.randn(n_weights) * 0.5
         w_key = tuple(weights)
         individual_map[w_key] = {"fitness": []}
 
