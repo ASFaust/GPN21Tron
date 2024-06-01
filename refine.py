@@ -7,7 +7,7 @@ from train import simulate_world, get_opponents, evaluate_individual
 with open("individual_map.pkl", "rb") as f:
     individual_map = pickle.load(f)
 
-n_survivors = 10 # Number of top individuals to retrieve
+n_survivors = 20 # Number of top individuals to retrieve
 
 # Get top n individuals
 top_individuals, top_fitnesses = get_top_n_individuals(individual_map, n_survivors, 'mean')
@@ -15,16 +15,16 @@ top_individuals, top_fitnesses = get_top_n_individuals(individual_map, n_survivo
 for i in range(n_survivors):
     print(f"Individual {i + 1}: {top_individuals[i]} with mean fitness: {top_fitnesses[i]}")
 
-n_children = 1000 - n_survivors  # Number of children to generate
+n_children = 4000 - n_survivors  # Number of children to generate
 
-n_evals_per_individual = 20  # Number of evaluations per individual
+n_evals_per_individual = 100  # Number of evaluations per individual
 
 # Generate children
 children = []
 
 for i in range(n_children):
     parent = top_individuals[i % n_survivors]
-    child = parent + np.random.randn(6) * 0.1
+    child = parent + np.random.randn(32) * 0.05
     children.append(child)
 
 children.extend(top_individuals)
@@ -35,14 +35,14 @@ for i, child in enumerate(children):
     w_key = tuple(child)
     individual_map[w_key] = {"fitness": []}
 
-n_processes = cpu_count() - 1
+n_processes = cpu_count()
 
 pool = Pool(n_processes)
 
 n_individuals = len(individual_map)
 
 while True:
-    n_opponents = 25
+    n_opponents = 20
     opponents_list = [get_opponents(individual_map, n_opponents) for _ in range(n_processes)]
 
     results = pool.map(evaluate_individual, opponents_list)

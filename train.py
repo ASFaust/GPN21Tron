@@ -23,36 +23,33 @@ def simulate_world(weights, draw=False):
             x, y = controller.move()
             new_positions.append((i, x, y))
 
-        for i, x, y in new_positions:  # needs to be separate loop to avoid
-            # changing the board while iterating over it
+        for i, x, y in new_positions:
             game.update_pos(i, x, y)
         game.check_dead()
         game.update_board()
         for player in game.players.keys():
             fitness_counter[player] += 1
-    return fitness_counter  # returns the number of steps each player survived
+    return fitness_counter
 
 def get_opponents(individual_map, n_opponents):
-    # get the individuals with the lowest number of evaluations
-    individuals = list(individual_map.keys())
-    # shuffle the individuals to avoid always selecting the same ones
-    np.random.shuffle(individuals)
-    individuals = sorted(individuals, key=lambda x: len(individual_map[x]["fitness"]))
-    return individuals[:n_opponents]
+    eligible_individuals = [ind for ind in individual_map if len(individual_map[ind]["fitness"]) < 100]
+    np.random.shuffle(eligible_individuals)
+    if len(eligible_individuals) < n_opponents:
+        eligible_individuals.extend([ind for ind in individual_map if len(individual_map[ind]["fitness"]) >= 100])
+    return eligible_individuals[:n_opponents]
 
 def evaluate_individual(opponents):
-    fitnesses = simulate_world(opponents, draw=False)
+    weights = [np.array(opponent) for opponent in opponents]
+    fitnesses = simulate_world(weights)
     fitnesses = np.argsort(fitnesses)
     fitnesses = np.argsort(fitnesses).astype(np.float32) + 1
     fitnesses /= len(opponents)
     return opponents, fitnesses
 
 if __name__ == "__main__":
-    n_individuals = 1000
-    n_weights = 6
-    # min_opponents = 24
-    # max_opponents = 25
-    n_evals_per_individual = 20
+    n_individuals = 4000
+    n_weights = 32
+    n_evals_per_individual = 100
     individual_map = {}
 
     for i in range(n_individuals):
@@ -62,8 +59,8 @@ if __name__ == "__main__":
 
     pool = Pool(cpu_count())
 
-    while True:
-        n_opponents = 25  # np.random.randint(min_opponents, max_opponents)
+    while any(len(fss["fitness"]) < n_evals_per_individual for fss in individual_map.values()):
+        n_opponents = 20
         opponents_list = [get_opponents(individual_map, n_opponents) for _ in range(cpu_count())]
 
         results = pool.map(evaluate_individual, opponents_list)
@@ -74,9 +71,6 @@ if __name__ == "__main__":
 
         progress = sum(len(fss["fitness"]) for fss in individual_map.values())
         print(f"Progress: {progress}/{n_evals_per_individual * n_individuals}")
-
-        if progress >= n_evals_per_individual * n_individuals:
-            break
 
     pool.close()
     pool.join()

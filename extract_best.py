@@ -9,10 +9,12 @@ def aggregate_fitness(fitness_list, method):
         return max(fitness_list)
     elif method == 'min':
         return min(fitness_list)
+    elif method == 'number_of_wins':
+        return len([f for f in fitness_list if f == 1])
     else:
         raise ValueError("Unsupported aggregation method: choose 'mean', 'max', or 'min'")
 
-def get_top_n_individuals(individual_map, n=1, aggregation_method='mean'):
+def get_top_n_individuals(individual_map, n=1, aggregation_method='number_of_wins'):
     ind_keys = list(individual_map.keys())
 
     ind_agg_fitness = []
@@ -39,8 +41,8 @@ if __name__ == "__main__":
         individual_map = pickle.load(f)
 
     # Parameters
-    n = 3  # Number of top individuals to retrieve
-    aggregation_method = 'mean'  # Aggregation method: 'mean', 'max', or 'min'
+    n = 10  # Number of top individuals to retrieve
+    aggregation_method = 'number_of_wins'  # Aggregation method: 'mean', 'max', or 'min'
 
     # Get top n individuals
     top_individuals, top_fitnesses = get_top_n_individuals(individual_map, n, aggregation_method)

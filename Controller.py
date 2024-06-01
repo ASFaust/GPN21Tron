@@ -9,7 +9,7 @@ class Controller:
         self.player_id = player_id
         self.game.update_pos(player_id, player_id * 2, player_id * 2)
         self.game.update_board()
-        self.weights = weights
+        self.weights = np.array(weights)
 
     def move(self,as_string=False):
         x,y = self.game.players[self.player_id]
@@ -47,8 +47,18 @@ class Controller:
         score_05 = self.score_flood_fill(possible_moves)
         score_06 = self.score_best_distance(possible_moves)
         sum_scores = np.array([score_01,score_02,score_03,score_04,score_05,score_06]).T
-        sum_scores = np.dot(sum_scores,self.weights)
-        return sum_scores
+        final_scores = []
+        for i in range(sum_scores.shape[0]):
+            scores = sum_scores[i] #scores is a 6-element array
+            w1 = self.weights[0:24].reshape(6,4)
+            b1 = self.weights[24:28]
+            h1 = np.dot(scores,w1) + b1
+            h1[h1<0] = 0
+            w2 = self.weights[28:32]
+            h2 = np.dot(h1,w2)
+            final_scores.append(h2)
+
+        return np.array(final_scores).flatten()
 
     def score_count_empty(self,possible_moves,deltas):
         """
