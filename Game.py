@@ -60,6 +60,7 @@ class Game:
         canvas[self.board != -1] = self.colors[self.board[self.board != -1]]
         #resize to 800x800, with clearly visible pixels
         canvas = cv2.resize(canvas, (800, 800), interpolation=cv2.INTER_NEAREST)
+        canvas = np.swapaxes(canvas, 0, 1)
         return canvas
 
     def copy(self):

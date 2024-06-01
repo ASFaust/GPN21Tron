@@ -60,7 +60,7 @@ class Controller:
             w1 = self.weights[0:9*self.n_neurons].reshape(9,self.n_neurons)
             b1 = self.weights[9*self.n_neurons:10*self.n_neurons]
             h1 = np.dot(scores,w1) + b1
-            h1[h1<0] = 0
+            h1 = np.sin(h1)
             w2 = self.weights[11*self.n_neurons:12*self.n_neurons]
             h2 = np.dot(h1,w2)
             final_scores.append(h2)

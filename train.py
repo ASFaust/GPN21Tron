@@ -8,7 +8,7 @@ from multiprocessing import Pool, cpu_count
 n_neurons = 8
 n_individuals = 2000
 n_weights = 12 * n_neurons
-n_evals_per_individual = 40
+n_evals_per_individual = 10
 n_opponents = 20
 
 def simulate_world(weights, draw=False):
