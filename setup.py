@@ -13,13 +13,17 @@ ext_modules = [
             'src/TronListener.cpp',
             'src/TronAI.cpp',
             'src/Player.cpp',
-            'src/TronSimulator.cpp',
             'src/vec.cpp'
         ],
         include_dirs=[
             "include/"
         ],
         language='c++',
+        # Debug build: -g keeps symbol/line info, -O0 stops the optimizer from
+        # reordering/inlining away the breadcrumb path, -rdynamic exports
+        # symbols so backtrace_symbols() can name the frames in debug.h.
+        extra_compile_args=['-g', '-O3', '-std=c++17'],
+        #extra_link_args=['-rdynamic'],
         #extra_compile_args=['-Wno-sign-compare', '-Wno-reorder', '-O3', '-std=c++17']
         ),
 ]

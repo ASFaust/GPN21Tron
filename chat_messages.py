@@ -1,0 +1,100 @@
+import random
+from concepts import gen  # creates random nouns like "magic lobster" or "gearbox-powered giraffe"
+
+def other_player_died_msg(player_name):
+    return random.choice([
+        f"RIP {player_name} :(",
+        f"{player_name} was a true {gen()}",
+        f"f in the chat for {player_name}",
+        f"and {player_name} bites the dust",
+        f"oof {player_name}, didn't see that wall coming huh?",
+        f"gg {player_name}, you fought like a {gen()}",
+        f"o7 to {player_name}, a fallen {gen()}",
+        f"down goes {player_name}!",
+        f"that's gotta hurt {player_name}. you ok over there?",
+        f"farewell sweet {player_name}, we hardly knew ye",
+        f"one less {gen()} on the grid, rip {player_name}",
+        f"press F to pay respects to {player_name}",
+        f"another soul claimed by the wall gods... pour one out for {player_name}",
+        f"nooo not {player_name} D:",
+        f"see you in the next round, {player_name}",
+        f"{player_name} got rekt by a wall lmao",
+        f"so long {player_name}, you glorious {gen()}",
+        f"{player_name} has left the grid. and also this mortal plane.",
+        f"the wall remembers {player_name}. the wall always remembers.",
+        f"{player_name}.exe has stopped responding",
+        f"alas, {player_name}, slain by geometry itself",
+        f"{player_name} took the scenic route straight into a wall",
+        f"somewhere a {gen()} weeps for {player_name}",
+        f"{player_name} ran out of grid. classic {gen()} mistake.",
+        f"we will name a {gen()} after you, {player_name}",
+        f"{player_name} chose violence and lost. respect though.",
+        f"goodnight sweet {player_name}, flights of {gen()}s sing thee to thy rest",
+        f"{player_name} is now one with the wall",
+        f"big oof for {player_name}. walls: 1, {player_name}: 0",
+        f"{player_name} discovered the wall was load-bearing. for the round.",
+    ])
+
+def i_died_msg():
+    return random.choice([
+        f"welp. tell my {gen()} i love them",
+        f"that was lag i swear",
+        f"i meant to do that",
+        f"my {gen()} senses failed me today",
+        f"ouch. into the wall i go like a real {gen()}",
+        f"i regret nothing... except that",
+        f"goodbye cruel grid, your {gen()} has fallen",
+        f"i'll be back, stronger, more {gen()}",
+        f"how did i not see that wall, i'm a disgrace to {gen()}s everywhere",
+        f"send help and one (1) {gen()}",
+        f"this is fine. everything is fine.",
+        f"well played, my fellow {gen()}",
+        f"i blame the {gen()}",
+        f"working as intended (it was not)",
+        f"a {gen()} never dies. it just respawns next round.",
+        f"i have made a huge mistake",
+        f"the wall came out of nowhere, your honor",
+        f"task failed successfully",
+        f"don't cry for me, i was a {gen()} who lived freely",
+        f"my code was perfect. reality was wrong.",
+        f"i sacrificed myself for the {gen()}. you're welcome.",
+        f"plot twist: i'm fine, it's the rest of you who are doomed",
+        f"that's a strategic retreat into the afterlife, look it up",
+        f"git blame says it wasn't me",
+        f"i died as i lived: confused and slightly to the left",
+    ])
+
+def i_won_msg():
+    return random.choice([
+        f"ggwp :)",
+        f"ggwp :D",
+        f"gg, all hail the {gen()}",
+        f"too easy, get rekt",
+        f"and that's how a {gen()} does it",
+        f"another victory for the {gen()} hall of fame",
+        f"bow before your new {gen()} overlord",
+        f"i am inevitable. also a {gen()}.",
+        f"victory tastes like {gen()}",
+        f"gg everyone, the {gen()} reigns supreme",
+        f"was there ever any doubt? i'm a {gen()} after all",
+        f"another day, another defeated {gen()}",
+        f"the grid belongs to the {gen()} now",
+        f"flawless. {gen()}-tier gameplay.",
+        f"ez clap, gg :)",
+        f"all according to keikaku (keikaku means {gen()})",
+        f"i'm not saying i'm the best {gen()}, but i am the best {gen()}",
+        f"the prophecy of the {gen()} is fulfilled",
+        f"outplayed, outlasted, out-{gen()}'d",
+        f"add it to the {gen()}'s trophy wall",
+        f"i came, i saw, i {gen()}'d",
+        f"the walls feared me. correctly.",
+        f"gg, blame your loss on lag if you must. i won't tell.",
+        f"this victory brought to you by one (1) extremely confident {gen()}",
+        f"crown me. i'll wait. (i'm a {gen()}, i have time)",
+        f"that's the {gen()} way, baby",
+    ])
+
+if __name__ == '__main__':
+    print(other_player_died_msg("SomePlayer"))
+    print(i_died_msg())
+    print(i_won_msg())

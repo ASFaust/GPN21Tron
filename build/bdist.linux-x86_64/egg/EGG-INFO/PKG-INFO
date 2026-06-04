@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: TronGamer
+Version: 0.0.1
+Summary: TronGamer
+Home-page: 
+Author: Andreas Faust
+Author-email: andreas.s.faust@gmail.com
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"
