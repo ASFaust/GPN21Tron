@@ -217,8 +217,8 @@ string Board::get_player_move(){
     //   per move:     score = mean(r) - K * std(r)
     // K is hand-tuned; K=0 is plain expected reward (first experiment).
     // W_WIN/W_LOSS dominate max_depth so a decisive result outweighs survival.
-    const double W_WIN  = 1000.0;
-    const double W_LOSS = 1000.0;
+    const double W_WIN  = 10.0;
+    const double W_LOSS = 10.0;
     const double K      = 0.0;
 
     int best_i = 0;

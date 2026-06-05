@@ -14,8 +14,8 @@ class Tron:
     def __init__(self):
         self.host = '151.216.211.107'
         self.port = 4000
-        self.username = "Mr. Test"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
-        self.password = "testtests"
+        self.username = "Mr. Markov"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.password = "asgoisahg"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
         # Disable Nagle: our messages are tiny (move|up\n) and strictly
@@ -108,7 +108,6 @@ class Tron:
             if msg[0] == "game":
                 print("game start message received.")
                 game_dim = (int(msg[1]), int(msg[2]))
-                n_players = int(msg[1]) // 2 # number of players = half the width
                 self.player_id = int(msg[3]) # our own player id
                 game_message_received = True
             if not game_message_received:
@@ -124,9 +123,12 @@ class Tron:
                 positions_x.append(x)
                 positions_y.append(y)
             if msg[0] == "tick": #the trigger to create the board
-                #we assert that we have all the info 
+                #we assert that we have all the info
                 assert game_dim is not None, "game_dim is None"
-                assert len(self.player_names) == n_players, f"expected {n_players} player messages but got {len(self.player_names)}"
+                #the number of player messages is the authoritative player count;
+                #width//2 is only a server-side guarantee we cross-check against.
+                n_players = len(self.player_names)
+                assert n_players == game_dim[0] // 2, f"expected width//2={game_dim[0] // 2} players but got {n_players}"
                 assert len(positions_x) == n_players, f"expected {n_players} position messages but got {len(positions_x)}"
                 assert len(positions_y) == n_players, f"expected {n_players} position messages but got {len(positions_y)}"
                 assert set(self.player_names.keys()) == set(range(n_players)), f"expected player ids to be contiguous and start at 0, but got {list(self.player_names.keys())}"
@@ -149,6 +151,9 @@ class Tron:
         xs = np.zeros(self.num_players, dtype=np.uint32)
         ys = np.zeros(self.num_players, dtype=np.uint32)
         for player_id, (x, y) in position_updates.items():
+            if player_id >= self.num_players:
+                #ignore stray updates for players beyond our known roster
+                continue
             xs[player_id] = x
             ys[player_id] = y
         self.board.update_positions(xs, ys)
