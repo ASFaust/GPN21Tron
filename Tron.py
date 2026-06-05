@@ -10,6 +10,32 @@ import queue
 import TronBoard
 from chat_messages import i_died_msg, other_player_died_msg, i_won_msg
 
+"""
+# 1 cfg 42 | wr= 34.6% (9/26, 1 draws, 323 opps) | sims=  319 depth=  47 W_WIN= 0.11 W_LOSS=28.05 K=-0.985
+     {'num_sims': 319, 'max_depth': 47, 'W_WIN': 0.11, 'W_LOSS': 28.05, 'K': -0.985}
+# 2 cfg 49 | wr= 32.0% (8/25, 0 draws, 321 opps) | sims=  161 depth=  93 W_WIN= 2.40 W_LOSS=15.34 K=-2.719
+     {'num_sims': 161, 'max_depth': 93, 'W_WIN': 2.4, 'W_LOSS': 15.34, 'K': -2.719}
+# 3 cfg  2 | wr= 30.8% (8/26, 0 draws, 323 opps) | sims=  484 depth=  31 W_WIN= 8.43 W_LOSS=99.47 K=0.028
+     {'num_sims': 484, 'max_depth': 31, 'W_WIN': 8.43, 'W_LOSS': 99.47, 'K': 0.028}
+# 4 cfg 77 | wr= 30.8% (8/26, 1 draws, 321 opps) | sims=  127 depth= 118 W_WIN= 0.16 W_LOSS= 0.11 K=-0.637
+     {'num_sims': 127, 'max_depth': 118, 'W_WIN': 0.16, 'W_LOSS': 0.11, 'K': -0.637}
+# 5 cfg 17 | wr= 26.9% (7/26, 1 draws, 323 opps) | sims=  300 depth=  50 W_WIN= 0.91 W_LOSS= 0.42 K=-1.880
+     {'num_sims': 300, 'max_depth': 50, 'W_WIN': 0.91, 'W_LOSS': 0.42, 'K': -1.88}
+# 6 cfg 61 | wr= 25.0% (7/28, 1 draws, 330 opps) | sims=  208 depth=  72 W_WIN= 1.40 W_LOSS=75.52 K=-1.330
+     {'num_sims': 208, 'max_depth': 72, 'W_WIN': 1.4, 'W_LOSS': 75.52, 'K': -1.33}
+# 7 cfg  0 | wr= 24.0% (6/25, 0 draws, 323 opps) | sims=   80 depth= 188 W_WIN=31.77 W_LOSS= 2.45 K=-1.446
+     {'num_sims': 80, 'max_depth': 188, 'W_WIN': 31.77, 'W_LOSS': 2.45, 'K': -1.446}
+# 8 cfg  1 | wr= 23.1% (6/26, 1 draws, 320 opps) | sims=  405 depth=  37 W_WIN= 2.17 W_LOSS=38.67 K=-1.180
+     {'num_sims': 405, 'max_depth': 37, 'W_WIN': 2.17, 'W_LOSS': 38.67, 'K': -1.18}
+# 9 cfg 45 | wr= 23.1% (6/26, 1 draws, 323 opps) | sims=  224 depth=  67 W_WIN=11.23 W_LOSS=23.03 K=-0.672
+     {'num_sims': 224, 'max_depth': 67, 'W_WIN': 11.23, 'W_LOSS': 23.03, 'K': -0.672}
+#10 cfg 87 | wr= 22.2% (6/27, 2 draws, 322 opps) | sims=   56 depth= 268 W_WIN= 1.16 W_LOSS= 4.42 K=-0.008
+     {'num_sims': 56, 'max_depth': 268, 'W_WIN': 1.16, 'W_LOSS': 4.42, 'K': -0.008}
+
+"""
+
+#{'num_sims': 97, 'max_depth': 309, 'W_WIN': 6.54, 'W_LOSS': 100.8, 'K': 0.126}
+
 class Tron:
     def __init__(self):
         self.host = '151.216.211.107'
@@ -37,6 +63,15 @@ class Tron:
         # state the server reports against what we expect each tick.
         self.messages = queue.Queue()  # for testing: store messages received from the server
         self.num_players = None
+        # MCMC hyperparameters, passed straight through to get_player_move.
+        self.mcmc_params = dict(
+            num_sims=5000,
+            max_depth=300,
+            W_WIN=6.54,
+            W_LOSS=100.8,
+            K=0.0,
+            DIR_PERSIST=0.0,
+        )
         threading.Thread(
             target=self._receiver_loop,
             daemon=True
@@ -54,7 +89,6 @@ class Tron:
                 return
 
             buffer += self._decoder.decode(chunk)
-            print(f"[RECV] {buffer}")
 
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
@@ -65,7 +99,6 @@ class Tron:
         self.send(f"join|{self.username}|{self.password}")
 
     def send(self, msg):
-        print(msg)
         self.sock.sendall((msg + "\n").encode('utf-8'))
 
     def chat(self, msg):
@@ -80,15 +113,16 @@ class Tron:
             self.chat(other_player_died_msg(player_name))
 
     def move(self):
-        print("computing move...")
         start_time = time.time()
-        move = self.board.get_player_move()
+        move = self.board.get_player_move(**self.mcmc_params)
+        compute = time.time() - start_time
+        print(f"move computed in {compute} seconds.")
         if move == "rip":
             print("no possible moves, i'm dead :(")
             self.chat(i_died_msg())
             self.send("move|up")
-        compute = time.time() - start_time
-        print(f"move computed in {compute} seconds.")
+            return            
+
         self.send(f"move|{move}")  # send final move command
 
     def init_board(self):
@@ -142,9 +176,10 @@ class Tron:
         self.dead = False
         print(f"board initialized: {game_dim[0]}x{game_dim[1]}, players: {list(self.player_names.values())}")
         self.num_players = n_players
-    
+#        best: sims=  857 depth=  35 W_WIN= 1.43 W_LOSS=  1.76 K=-1.613 DIR_PERSIST=-0.101
+#        best: sims=  857 depth=  35 W_WIN= 1.43 W_LOSS=  3.10 K=-1.613 DIR_PERSIST=-0.101
+
     def update_board(self, position_updates):
-        print("tick received, updating board state...")
         #we need two numpy arrays, of shape (num_players,)
         #one for x and one for y, to call the board update function
         #we only have partial position updates, but that's okay: everybody else is dead
@@ -167,8 +202,7 @@ class Tron:
             if self.dead:
                 self.init_board() #wait for the next game to start
                 continue
-            msg = self.messages.get() #blocking wait for the next message
-            print(msg)
+            msg = self.messages.get() #blocking wait for the next message            print(msg)
             if msg[0] == "die":
                 self.someone_died(msg)
             if msg[0] == "tick":

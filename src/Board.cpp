@@ -46,6 +46,7 @@ Board::Board(unsigned char _width, unsigned int _num_players, unsigned int _play
     board         = new unsigned int[board_size];
     head_map = new unsigned int[board_size];
     for (unsigned int i = 0; i < 32; ++i) head_pos[i] = 0;
+    for (unsigned int i = 0; i < 32; ++i) last_dir[i] = -1; // no direction chosen yet
     for (unsigned int i = 0; i < board_size;  ++i) { board[i] = 0; head_map[i] = 0; }
 
     nbr = get_nbr_table(_width); // shared, not owned
@@ -75,6 +76,7 @@ Board::Board(const Board& other) {
     board    = new unsigned int[board_size];
     head_map = new unsigned int[board_size];
     for (unsigned int i = 0; i < 32; ++i) head_pos[i] = other.head_pos[i];
+    for (unsigned int i = 0; i < 32; ++i) last_dir[i] = other.last_dir[i];
     for (unsigned int i = 0; i < board_size; ++i) {
         board[i]    = other.board[i];
         head_map[i] = other.head_map[i];
@@ -95,6 +97,7 @@ Board& Board::operator=(const Board& other) {
 
     unsigned int board_size = (unsigned int)width * width;
     for (unsigned int i = 0; i < 32; ++i) head_pos[i] = other.head_pos[i];
+    for (unsigned int i = 0; i < 32; ++i) last_dir[i] = other.last_dir[i];
     for (unsigned int i = 0; i < board_size; ++i) {
         board[i]    = other.board[i];
         head_map[i] = other.head_map[i];
@@ -186,19 +189,21 @@ string interpret_direction(unsigned int d) {
     }
 }
 
-string Board::get_player_move(){
-    const unsigned int* nb = &nbr[head_pos[player_id] * 4];
+int Board::pick_move_dir(unsigned int q,
+                         unsigned int num_sims,
+                         unsigned int max_depth,
+                         double W_WIN, double W_LOSS, double K, double DIR_PERSIST,
+                         unsigned int seed) {
+    const unsigned int* nb = &nbr[head_pos[q] * 4];
     unsigned int possible[4];   // direction indices of free cells
     int np = 0;
     for (int d = 0; d < 4; ++d) {
         unsigned int c = nb[d];
         if (board[c] & alive_mask) continue;   // occupied by an alive bit
         possible[np++]  = d;
-    }   
-    if (np == 0){
-        return "rip"; 
     }
-    if (np == 1) return interpret_direction(possible[0]);
+    if (np == 0) return -1;          // boxed in: caller decides what to do
+    if (np == 1) { last_dir[q] = possible[0]; return possible[0]; } // forced move, skip the rollouts
 
     //now we can do MCMC here!
     //for each possible move, roll out random games that start by committing to
@@ -207,9 +212,11 @@ string Board::get_player_move(){
     for (int i = 0; i < np; ++i){
         move_scores[i] = run_mcmc(
             *this,
+            q,               // perspective player
             nb[possible[i]], // destination cell of this candidate move
-            200,             // num sims
-            50               // max depth
+            num_sims,        // num sims
+            max_depth,       // max depth
+            seed             // rollout seed
         );
     }
     // Collapse each move's rollouts into a single pessimistic score:
@@ -217,10 +224,7 @@ string Board::get_player_move(){
     //   per move:     score = mean(r) - K * std(r)
     // K is hand-tuned; K=0 is plain expected reward (first experiment).
     // W_WIN/W_LOSS dominate max_depth so a decisive result outweighs survival.
-    const double W_WIN  = 10.0;
-    const double W_LOSS = 10.0;
-    const double K      = 0.0;
-
+    // W_WIN, W_LOSS and K are supplied by the caller (see signature).
     int best_i = 0;
     double best_score = -INFINITY;
     for (int i = 0; i < np; ++i){
@@ -241,12 +245,101 @@ string Board::get_player_move(){
         if (var < 0.0) var = 0.0;               // guard against fp noise
         double score = mean - K * std::sqrt(var);
 
+        // Direction persistence: give the previously-chosen direction a small
+        // bonus so the path stays straighter and less random. DIR_PERSIST=0
+        // recovers the original behavior. Applied after the mean - K*std score.
+        if ((int)possible[i] == last_dir[q]) score += DIR_PERSIST;
+
         if (score > best_score){
             best_score = score;
             best_i = i;
         }
     }
-    return interpret_direction(possible[best_i]);
+    last_dir[q] = possible[best_i]; // remember for the next call's persistence boost
+    return possible[best_i];
+}
+
+string Board::get_player_move(unsigned int num_sims,
+                              unsigned int max_depth,
+                              double W_WIN,
+                              double W_LOSS,
+                              double K,
+                              double DIR_PERSIST){
+    int d = pick_move_dir(player_id, num_sims, max_depth,
+                          W_WIN, W_LOSS, K, DIR_PERSIST, /*seed=*/123);
+    if (d < 0) return "rip";
+    return interpret_direction((unsigned int)d);
+}
+
+int Board::get_move(unsigned int q,
+                    unsigned int num_sims,
+                    unsigned int max_depth,
+                    double W_WIN, double W_LOSS, double K, double DIR_PERSIST,
+                    unsigned int seed){
+    return pick_move_dir(q, num_sims, max_depth, W_WIN, W_LOSS, K, DIR_PERSIST, seed);
+}
+
+void Board::step_dirs(const std::vector<int>& dirs) {
+    unsigned int idxs[32];
+    for (unsigned int q = 0; q < num_players; ++q) {
+        if (!(alive_mask & (1U << q)) || q >= dirs.size()) {
+            idxs[q] = 0; // dead / unspecified: placeholder, step() skips it
+            continue;
+        }
+        int d = dirs[q];
+        // A boxed-in player reports dir -1; send it into an (occupied)
+        // neighbour so step() resolves its death normally.
+        unsigned int dir = (d >= 0 && d < 4) ? (unsigned int)d : 0;
+        idxs[q] = nbr[head_pos[q] * 4 + dir];
+    }
+    step(idxs);
+}
+
+bool Board::is_alive(unsigned int q) const {
+    return (alive_mask & (1U << q)) != 0;
+}
+
+unsigned int Board::count_alive() const {
+    return (unsigned int)__builtin_popcount(alive_mask);
+}
+
+unsigned int Board::get_width() const {
+    return (unsigned int)width;
+}
+
+std::vector<int> Board::get_trail_grid() const {
+    unsigned int board_size = (unsigned int)width * width;
+    std::vector<int> grid(board_size);
+    for (unsigned int i = 0; i < board_size; ++i) {
+        // Only render trails of still-alive players: a dead player's bits linger
+        // in `board` but its cells should revert to background.
+        grid[i] = (board[i] & alive_mask) ? (int)__builtin_ctz(board[i]) : -1;
+    }
+    return grid;
+}
+
+std::vector<int> Board::get_head_grid() const {
+    unsigned int board_size = (unsigned int)width * width;
+    std::vector<int> grid(board_size);
+    for (unsigned int i = 0; i < board_size; ++i) {
+        // Skip dead players: their head stays in head_map but must not render.
+        unsigned int h = head_map[i];
+        grid[i] = (h && (alive_mask & (1U << (h - 1)))) ? (int)(h - 1) : -1;
+    }
+    return grid;
+}
+
+std::vector<bool> Board::get_alive() const {
+    std::vector<bool> a(num_players);
+    for (unsigned int q = 0; q < num_players; ++q) {
+        a[q] = (alive_mask & (1U << q)) != 0;
+    }
+    return a;
+}
+
+int Board::winner() const {
+    if (count_alive() != 1) return -1; // still running, or mutual-death draw
+    return __builtin_ctz(alive_mask);
 }
 
 Board::~Board() {

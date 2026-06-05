@@ -55,5 +55,30 @@ PYBIND11_MODULE(TronBoard, m) {
                py::arg("xs"),
                py::arg("ys"))
           .def("remove_player", &Board::remove_player, py::arg("p_id"))
-          .def("get_player_move", &Board::get_player_move);
+          .def("get_player_move", &Board::get_player_move,
+               py::arg("num_sims")    = 200,
+               py::arg("max_depth")   = 50,
+               py::arg("W_WIN")       = 10.0,
+               py::arg("W_LOSS")      = 10.0,
+               py::arg("K")           = 0.0,
+               py::arg("DIR_PERSIST") = 0.0)
+          // --- local self-play / evaluation interface ---
+          .def("get_move", &Board::get_move,
+               py::arg("q"),
+               py::arg("num_sims")    = 200,
+               py::arg("max_depth")   = 50,
+               py::arg("W_WIN")       = 10.0,
+               py::arg("W_LOSS")      = 10.0,
+               py::arg("K")           = 0.0,
+               py::arg("DIR_PERSIST") = 0.0,
+               py::arg("seed")        = 123)
+          .def("step_dirs", &Board::step_dirs, py::arg("dirs"))
+          .def("is_alive", &Board::is_alive, py::arg("q"))
+          .def("count_alive", &Board::count_alive)
+          .def("winner", &Board::winner)
+          // --- state readout (for visualization) ---
+          .def("get_width", &Board::get_width)
+          .def("get_trail_grid", &Board::get_trail_grid)
+          .def("get_head_grid", &Board::get_head_grid)
+          .def("get_alive", &Board::get_alive);
 }

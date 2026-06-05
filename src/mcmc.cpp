@@ -5,13 +5,15 @@
 using namespace std;
 
 vector<MCMC_result> run_mcmc(const Board& board,
+                             unsigned int player_id,
                              unsigned int player_move_pos,
                              unsigned int num_sims,
-                             unsigned int max_depth) {
+                             unsigned int max_depth,
+                             unsigned int seed) {
     vector<MCMC_result> results(num_sims);
 
     RNG_STATE rng;
-    seed_rng(rng, 123); // fixed seed for reproducibility
+    seed_rng(rng, seed); // caller-supplied seed (vary per game for fair battles)
 
     Board sim_board = board; // deep copy via Board's copy constructor
     unsigned int idxs[32];
@@ -26,14 +28,14 @@ vector<MCMC_result> run_mcmc(const Board& board,
                 idxs[q] = 0; // dead players don't move; placeholder value
                 continue;
             }
-            idxs[q] = (q == sim_board.player_id)
+            idxs[q] = (q == player_id)
                           ? player_move_pos
                           : sim_board.get_random_move(q, rng);
         }
         sim_board.step(idxs);
 
-        bool player_dead = !(sim_board.alive_mask & (1U << sim_board.player_id));
-        bool player_win  =  (sim_board.alive_mask == (1U << sim_board.player_id));
+        bool player_dead = !(sim_board.alive_mask & (1U << player_id));
+        bool player_win  =  (sim_board.alive_mask == (1U << player_id));
 
         unsigned int depth = 1;
         results[i].time_alive = player_dead ? 0 : 1;
@@ -50,8 +52,8 @@ vector<MCMC_result> run_mcmc(const Board& board,
             sim_board.step(idxs);
             ++depth;
 
-            player_dead = !(sim_board.alive_mask & (1U << sim_board.player_id));
-            player_win  =  (sim_board.alive_mask == (1U << sim_board.player_id));
+            player_dead = !(sim_board.alive_mask & (1U << player_id));
+            player_win  =  (sim_board.alive_mask == (1U << player_id));
             if (!player_dead) results[i].time_alive = depth;
         }
 
