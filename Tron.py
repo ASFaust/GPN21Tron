@@ -1,17 +1,20 @@
 import socket
 import select
 import codecs
-import numpy as np
-from TronGamer import TronListener, TronAI
-from chat_messages import i_died_msg, other_player_died_msg, i_won_msg
 import time
 import random
+import numpy as np
+import threading
+import queue
+
+import TronBoard
+from chat_messages import i_died_msg, other_player_died_msg, i_won_msg
 
 class Tron:
     def __init__(self):
         self.host = '151.216.211.107'
         self.port = 4000
-        self.username = "Gorgel"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
+        self.username = "Mr. Test"  # scarab hieroglyph #"\U000131BD"  # Egyptian hieroglyph A52 (bird)
         self.password = "testtests"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
@@ -23,183 +26,169 @@ class Tron:
         # blocking in recv() forever.
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         print("connected.")
-        self.AI = TronAI(0.07,1000) #max_time (seconds), max_steps :O
-        print("c++ init done.")
-        self.listener = None
+        self.board = None
+        self.player_id = None
+        self.dead = False
         self.player_names = {}
         # Incremental decoder so a multi-byte char (emoji, hieroglyph) split
         # across two recv() chunks doesn't raise UnicodeDecodeError and crash.
         self._decoder = codecs.getincrementaldecoder('utf-8')()
         # State verification: last (x, y) we saw per player, used to compare the
         # state the server reports against what we expect each tick.
-        self.last_pos = {}
-        # Read-timeout handling. The idle between rounds can be several minutes,
-        # so the socket only gets a timeout while a round is actively running.
-        # read_timeout is adapted from the observed tick interval (see run()).
-        self.in_round = False
-        self.read_timeout = 2.0  # seconds, floor; refined once ticks are seen
-        print("init complete.")
+        self.messages = queue.Queue()  # for testing: store messages received from the server
+        self.num_players = None
+        threading.Thread(
+            target=self._receiver_loop,
+            daemon=True
+        ).start()
 
-    def _set_active(self, active):
-        """Arm a read timeout during a round, none during the idle between."""
-        self.in_round = active
-        self.sock.settimeout(self.read_timeout if active else None)
-
-    def _data_pending(self):
-        """True if the socket has bytes ready to read right now (non-blocking).
-        Used to tell whether more ticks are already queued so we can drain the
-        whole backlog and only act on the freshest one."""
-        return bool(select.select([self.sock], [], [], 0)[0])
-
-    def recv(self):
+    def _receiver_loop(self):
+        print("started receiver thread.")
         buffer = ""
+
         while True:
-            while "\n" in buffer:
-                # split the buffer at the first newline, yielding the first part
-                line, buffer = buffer.split("\n", 1)
-                # `more` is True when another complete line is already buffered,
-                # or the kernel has more bytes waiting -- i.e. we are behind and
-                # should keep draining before reacting.
-                more = ("\n" in buffer) or self._data_pending()
-                yield line.split("|"), more
-            # when no more newlines are in the buffer, read more data
-            print(f"[recv] blocking on recv, buffer so far={buffer!r}", flush=True)
-            try:
-                chunk = self.sock.recv(4096)
-            except socket.timeout:
-                # Only armed mid-round, so this means the server went quiet for
-                # several ticks' worth of time -- a real, actionable stall.
-                print(f"WARNING: no data for >{self.sock.gettimeout()}s during "
-                      f"active play -- possible network stall.")
-                continue
-            print(f"[recv] got {len(chunk)} bytes: {chunk!r}", flush=True)
-            if chunk == b'':
-                raise RuntimeError("socket connection broken")
+            chunk = self.sock.recv(4096)
+
+            if not chunk:
+                print("server closed connection.")
+                return
+
             buffer += self._decoder.decode(chunk)
+            print(f"[RECV] {buffer}")
+
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                self.messages.put(line.split("|"))
 
     def join(self):
+        print(f"joining as {self.username}...")
         self.send(f"join|{self.username}|{self.password}")
 
     def send(self, msg):
         print(msg)
         self.sock.sendall((msg + "\n").encode('utf-8'))
 
-    def set_player_name(self, msg):
-        player_id = int(msg[1])
-        player_name = msg[2]
-        self.player_names[player_id] = player_name
-
     def chat(self, msg):
         self.send(f"chat|{msg}")
-
-    def set_game(self, msg):
-        #width, height and self player id
-        width = int(msg[1])
-        height = int(msg[2])
-        self.player_id = int(msg[3])
-        self.listener = TronListener(width, height, self.player_id)
-        self.AI.set_listener(self.listener)
-        self.last_pos = {}  # fresh state for the new round
-
-    def update_pos(self, msg):
-        player_id = int(msg[1])
-        x = int(msg[2])
-        y = int(msg[3])
-        # Compare reported state against expectation: each tick a player should
-        # advance exactly one cell. A jump > 1 means we skipped a pos update
-        # (lost messages / parser desync); standing still can mean a move that
-        # never registered. Either is a signal something went wrong on the wire.
-        prev = self.last_pos.get(player_id)
-        if prev is not None:
-            delta = abs(x - prev[0]) + abs(y - prev[1])
-            if delta > 1:
-                who = self.player_names.get(player_id, f"Player {player_id}")
-                print(f"WARNING: {who} jumped {delta} cells "
-                      f"{prev} -> {(x, y)} (skipped a pos update?)")
-        self.last_pos[player_id] = (x, y)
-        self.listener.update_pos(player_id, x, y)
 
     def someone_died(self, msg):
         player_ids = msg[1:]
         for player_id in player_ids:
             player_id = int(player_id)
-            self.listener.remove_player(player_id)
+            self.board.remove_player(player_id)
             player_name = self.player_names.get(player_id, f"Player {player_id}")
             self.chat(other_player_died_msg(player_name))
 
     def move(self):
+        print("computing move...")
         start_time = time.time()
-        the_move = self.AI.get_move()
-        end_time = time.time()
-        compute = end_time - start_time
-        # The AI budget is 0.07s; if compute creeps toward that, the move risks
-        # missing the server's tick deadline and looking like a "lost" move.
-        if compute > 0.05:
-            print(f"WARNING: move computation took {compute:.3f}s "
-                  f"(close to the 0.07s budget).")
-        else:
-            print(f"moving took {compute:.4f} seconds.")
-        self.send(f"move|{the_move}")  # send final move command
+        move = self.board.get_player_move()
+        if move == "rip":
+            print("no possible moves, i'm dead :(")
+            self.chat(i_died_msg())
+            self.send("move|up")
+        compute = time.time() - start_time
+        print(f"move computed in {compute} seconds.")
+        self.send(f"move|{move}")  # send final move command
+
+    def init_board(self):
+        print("waiting for next game start...")
+        self.board = None
+        self.player_id = None
+        self.num_players = None
+        game_dim = None
+        positions_x = []
+        positions_y = []
+        self.player_names = {}
+        n_players = 0
+        game_message_received = False
+        #then we wait for the rest of the init messages until the first tick
+        while self.board is None:
+            msg = self.messages.get() #blocking wait for the next message
+            if msg[0] == "game":
+                print("game start message received.")
+                game_dim = (int(msg[1]), int(msg[2]))
+                n_players = int(msg[1]) // 2 # number of players = half the width
+                self.player_id = int(msg[3]) # our own player id
+                game_message_received = True
+            if not game_message_received:
+                continue 
+            if msg[0] == "player":
+                player_id = int(msg[1])
+                player_name = msg[2]
+                self.player_names[player_id] = player_name
+            if msg[0] == "pos":
+                player_id = int(msg[1])
+                x = int(msg[2])
+                y = int(msg[3])
+                positions_x.append(x)
+                positions_y.append(y)
+            if msg[0] == "tick": #the trigger to create the board
+                #we assert that we have all the info 
+                assert game_dim is not None, "game_dim is None"
+                assert len(self.player_names) == n_players, f"expected {n_players} player messages but got {len(self.player_names)}"
+                assert len(positions_x) == n_players, f"expected {n_players} position messages but got {len(positions_x)}"
+                assert len(positions_y) == n_players, f"expected {n_players} position messages but got {len(positions_y)}"
+                assert set(self.player_names.keys()) == set(range(n_players)), f"expected player ids to be contiguous and start at 0, but got {list(self.player_names.keys())}"
+                positions_x = np.array(positions_x, dtype=np.uint32)
+                positions_y = np.array(positions_y, dtype=np.uint32)
+                self.board = TronBoard.Board(width=game_dim[0], num_players=n_players,
+                                                player_id=self.player_id, xs=positions_x, ys=positions_y)
+                #send a down move after the first tick.
+                self.send(f"move|down")
+                break
+        self.dead = False
+        print(f"board initialized: {game_dim[0]}x{game_dim[1]}, players: {list(self.player_names.values())}")
+        self.num_players = n_players
+    
+    def update_board(self, position_updates):
+        print("tick received, updating board state...")
+        #we need two numpy arrays, of shape (num_players,)
+        #one for x and one for y, to call the board update function
+        #we only have partial position updates, but that's okay: everybody else is dead
+        xs = np.zeros(self.num_players, dtype=np.uint32)
+        ys = np.zeros(self.num_players, dtype=np.uint32)
+        for player_id, (x, y) in position_updates.items():
+            xs[player_id] = x
+            ys[player_id] = y
+        self.board.update_positions(xs, ys)
 
     def run(self):
         last_tick = time.time()
-        tp.join()
-        print("joined.")
-        # A tick obliges us to send exactly one move before the server's next
-        # tick deadline. But recv() can hand us several already-elapsed ticks in
-        # one batch (we fell behind); the server already logged ERROR_NO_MOVE for
-        # those and only the newest game state matters. So we never act on a
-        # buffered tick while more data is pending -- we drain everything first,
-        # then compute a single move from the freshest state.
-        pending_move = False
-        for msg, more in self.recv():
+        self.join()
+        self.init_board() 
+        position_updates = {}
+        while True:
+            if self.dead:
+                self.init_board() #wait for the next game to start
+                continue
+            msg = self.messages.get() #blocking wait for the next message
             print(msg)
-            if msg[0] == "game":
-               self.set_game(msg)
-               self._set_active(True)  # arm the read timeout for the round
-               pending_move = False  # fresh round, drop any stale obligation
-            if msg[0] == "player":
-                self.set_player_name(msg)
-            if self.listener is None:
-                print("listener is None")
-                continue
-            if self.listener.dead:
-                print("listener is dead")
-                continue
-            # -------------------------------- handling of in-game stuff: -----------------------------
-            if msg[0] == "pos":
-                self.update_pos(msg)
             if msg[0] == "die":
                 self.someone_died(msg)
             if msg[0] == "tick":
-                next_tick = time.time()
-                interval = next_tick - last_tick
+                self.update_board(position_updates)
+                now = time.time()
+                interval = now - last_tick
                 print(f"tick took {interval} seconds.")
-                last_tick = next_tick
-                # Refine the read timeout to a few ticks' worth of slack, so a
-                # genuine mid-round stall trips it without false positives.
-                self.read_timeout = max(2.0, interval * 4)
-                if self.in_round:
-                    self.sock.settimeout(self.read_timeout)
-                pending_move = True  # owe a move; sent once the backlog drains
-            # Only move when we have caught up to the latest available state.
-            # If more data is already waiting, keep draining so we react to the
-            # freshest tick instead of a stale one.
-            if pending_move and not more:
-                pending_move = False
+                last_tick = now
                 self.move()
             if msg[0] == "lose":
                 print("i lost.")
-                self.chat(i_died_msg())
-                self.listener.death()
-                self._set_active(False)  # back to blocking idle between rounds
+                self.dead = True
             if msg[0] == "win":
                 print("i WON :D")
                 self.chat(i_won_msg())
-                self._set_active(False)  # back to blocking idle between rounds
+                self.dead = True # to trigger the wait again for the next game start
             if msg[0] == "error":
                 print(msg)
+            if msg[0] == "pos":
+                player_id = int(msg[1])
+                x = int(msg[2])
+                y = int(msg[3])
+                position_updates[player_id] = (x, y)
+                #we wait for the tick message to update the board, to make sure we have all the position updates for this tick before we update the board state.
 
-
-tp = Tron()
-tp.run()
+if __name__ == "__main__":
+    tp = Tron()
+    tp.run()
