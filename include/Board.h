@@ -31,7 +31,8 @@ public:
                            double       W_WIN         = 10.0,
                            double       W_LOSS        = 10.0,
                            double       K             = 0.0,
-                           double       DIR_PERSIST   = 0.0);
+                           double       W_PLAYERS     = 0.0,
+                           double       W_FREE        = 1.0);
 
     // --- Local self-play / evaluation interface ---------------------------
     // The live client only ever drives its own `player_id`; for local battles
@@ -48,7 +49,8 @@ public:
                  double       W_WIN       = 10.0,
                  double       W_LOSS      = 10.0,
                  double       K           = 0.0,
-                 double       DIR_PERSIST = 0.0,
+                 double       W_PLAYERS   = 0.0,
+                 double       W_FREE      = 1.0,
                  unsigned int seed        = 123);
 
     // Advance the whole board by one tick: dirs[q] is the direction player q
@@ -86,15 +88,31 @@ public:
 private:
     unsigned int f(unsigned int x, unsigned int y) const;
 
+    unsigned int count_reachable_cells(unsigned int p_id) const;
+
+    unsigned int count_free_neighbors(unsigned int position) const;
+    
+    int min_enemy_distance(unsigned int q) const;
+
+    // Endgame helper: when player q is isolated from all enemies, pick the
+    // direction (0..3) that fills q's own region most efficiently. Greedy
+    // longest-path heuristic; see Board.cpp.
+    int fill_efficiently(unsigned int q) const;
+
+    // Region-quality score used by fill_efficiently: flood-fill the free space
+    // reachable after moving onto cell `c`, weighting each reachable cell by 2
+    // if it still has >=2 open neighbours (a pass-through cell) and 1 otherwise
+    // (a dead-end pocket). Higher is better.
+    long score_fill(unsigned int c) const;
+
     // Shared core of get_player_move/get_move: MCMC-pick a direction (0..3) for
     // player q, or -1 if it has no free neighbour. Pure function of state plus
     // the supplied hyperparameters and rollout seed.
-    // Not const: records the chosen direction in last_dir[q] so the next call
-    // can apply the DIR_PERSIST boost to it.
     int pick_move_dir(unsigned int q,
                       unsigned int num_sims,
                       unsigned int max_depth,
-                      double W_WIN, double W_LOSS, double K, double DIR_PERSIST,
+                      double W_WIN, double W_LOSS, double K,
+                      double W_PLAYERS, double W_FREE,
                       unsigned int seed);
 
     // Uniformly sample a free neighbouring cell for player q; if the player is
@@ -113,10 +131,6 @@ private:
     unsigned int  num_players;
     unsigned int  alive_mask;
     bool          dead;
-
-    // Last direction (0..3) MCMC-picked for each player, or -1 if none yet.
-    // Used to apply the DIR_PERSIST score boost so paths stay less jittery.
-    int           last_dir[32];
 
     unsigned int* head_pos;          // length 32, board index of each player's head
     unsigned int* board;         // width*width, OR-accumulated bit channels

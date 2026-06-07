@@ -48,9 +48,11 @@ def sample_config(rng):
         W_WIN=round(loguniform(rng, 0.01, 10.0), 2),
         W_LOSS=round(loguniform(rng, 0.1, 200.0), 2),
         K=round(rng.uniform(0.0, 3.0), 3),
-        # Direction persistence: bonus added to the previously-chosen direction's
-        # score, so the path stays straighter. 0 == original behavior.
-        DIR_PERSIST=round(loguniform(rng, 0.01, 20.0), 3),
+        # W_PLAYERS: reward (or, if negative, discourage) a change in the number
+        # of players alive over a rollout.
+        W_PLAYERS=round(loguniform(rng, 0.01, 20.0), 3),
+        # W_FREE: weight on the free (reachable) cell fraction.
+        W_FREE=round(loguniform(rng, 0.01, 20.0), 3),
     )
 
 
@@ -58,7 +60,7 @@ def fmt_config(c):
     return (
         f"sims={c['num_sims']:>5} depth={c['max_depth']:>4} "
         f"W_WIN={c['W_WIN']:>5.2f} W_LOSS={c['W_LOSS']:>5.2f} K={c['K']:>5.3f} "
-        f"DIR_PERSIST={c['DIR_PERSIST']:>5.3f}"
+        f"W_PLAYERS={c['W_PLAYERS']:>5.3f} W_FREE={c['W_FREE']:>5.3f}"
     )
 
 

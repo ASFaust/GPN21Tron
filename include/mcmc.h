@@ -12,8 +12,10 @@ class Board;
 struct MCMC_result {
     bool         win        = false; // player ended as the sole survivor
     bool         dead       = false; // player died during the rollout
-    unsigned int time_alive = 0;     // # of steps the player stayed alive
+    unsigned int time_to_death = 0;     // # of steps the player stayed alive
     unsigned int time_to_win = 0;    // depth at which the win happened (win only)
+    double reachable_cell_frac = 0;
+    int player_death_count = 0;
 };
 
 // Run `num_sims` random rollouts from `board`, evaluated from `player_id`'s

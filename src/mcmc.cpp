@@ -18,6 +18,8 @@ vector<MCMC_result> run_mcmc(const Board& board,
     Board sim_board = board; // deep copy via Board's copy constructor
     unsigned int idxs[32];
 
+    double number_of_cells = (double)(board.get_width() * board.get_width());
+
     for (unsigned int i = 0; i < num_sims; ++i) {
         sim_board = board; // reset to the original state for each sim
 
@@ -38,7 +40,6 @@ vector<MCMC_result> run_mcmc(const Board& board,
         bool player_win  =  (sim_board.alive_mask == (1U << player_id));
 
         unsigned int depth = 1;
-        results[i].time_alive = player_dead ? 0 : 1;
 
         // Random rollout until the player dies, wins, or we hit max_depth.
         while (!player_dead && !player_win && depth < max_depth) {
@@ -54,12 +55,23 @@ vector<MCMC_result> run_mcmc(const Board& board,
 
             player_dead = !(sim_board.alive_mask & (1U << player_id));
             player_win  =  (sim_board.alive_mask == (1U << player_id));
-            if (!player_dead) results[i].time_alive = depth;
         }
 
         results[i].win        = player_win;
         results[i].dead       = player_dead;
-        results[i].time_to_win = player_win ? depth : 0; // 0 == invalid (no win)
+        results[i].time_to_win = player_win ? depth : max_depth;
+        results[i].time_to_death = player_dead ? depth : max_depth;
+        
+        if(player_dead){
+            results[i].reachable_cell_frac = 0.0;
+        }else{
+            if(player_win){
+                results[i].reachable_cell_frac = 1.0;
+            }else{
+                results[i].reachable_cell_frac = sim_board.count_reachable_cells(player_id) / number_of_cells;
+            }
+        }
+        results[i].player_death_count = board.count_alive() - sim_board.count_alive();
     }
 
     return results;

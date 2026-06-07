@@ -21,7 +21,7 @@ Usage:
     python visualize_battle.py --cell 32 --fps 8 --auto
 """
 
-#{'num_sims': 142, 'max_depth': 211, 'W_WIN': 0.01, 'W_LOSS': 0.55, 'K': 0.122, 'DIR_PERSIST': 0.011}
+#{'num_sims': 142, 'max_depth': 211, 'W_WIN': 0.01, 'W_LOSS': 0.55, 'K': 0.122, 'W_PLAYERS': 0.011, 'W_FREE': 1.0}
 import argparse
 import random
 
@@ -33,7 +33,7 @@ import TronBoard
 
 # The tuned config from the Tron.py leaderboard (cfg 42).
 #DEFAULT_CONFIG = dict(num_sims=319, max_depth=47, W_WIN=0.11, W_LOSS=28.05, K=-0.985)
-DEFAULT_CONFIG = dict(num_sims=1000, max_depth=300, W_WIN=0.0, W_LOSS=0.0, K=0.0, DIR_PERSIST=2.0)
+DEFAULT_CONFIG = dict(num_sims=1000, max_depth=300, W_WIN=0.0, W_LOSS=0.0, K=0.0, W_PLAYERS=2.0, W_FREE=1.0)
 
 # Distinct BGR colors per player (cv2 uses BGR order).
 PLAYER_COLORS = [

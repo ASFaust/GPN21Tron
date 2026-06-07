@@ -70,6 +70,62 @@ def run_battle(configs, seed=None, max_ticks=None, verbose=False):
     return result
 
 
+def run_battle_ranked(configs, seed=None, max_ticks=None, verbose=False):
+    """Play one game; return a death-tick per config index (placement signal).
+
+    death_tick[q] is the tick at which player q died; survivors get the final
+    tick. Higher == survived longer == placed better. Equal ticks == tied
+    placement. This is the input to the ELO/placement scoring in the optimizer.
+    """
+    n = len(configs)
+    if n < 2:
+        raise ValueError("need at least 2 configs to battle")
+
+    width = 2 * n
+    if max_ticks is None:
+        max_ticks = width * width
+
+    rng = random.Random(seed)
+
+    xs = np.array([2 * q for q in range(n)], dtype=np.uint32)
+    ys = np.array([2 * q for q in range(n)], dtype=np.uint32)
+    board = TronBoard.Board(width=width, num_players=n, player_id=0, xs=xs, ys=ys)
+
+    death_tick = [None] * n
+
+    first = [rng.randrange(4) for _ in range(n)]
+    board.step_dirs(first)
+    tick = 1
+    for q in range(n):
+        if death_tick[q] is None and not board.is_alive(q):
+            death_tick[q] = tick
+
+    while board.count_alive() > 1 and tick < max_ticks:
+        dirs = []
+        for q in range(n):
+            if board.is_alive(q):
+                dirs.append(board.get_move(q, seed=rng.randrange(1, 2**32), **configs[q]))
+            else:
+                dirs.append(-1)
+        board.step_dirs(dirs)
+        tick += 1
+        for q in range(n):
+            if death_tick[q] is None and not board.is_alive(q):
+                death_tick[q] = tick
+
+    # Survivors (and anyone still flagged alive at the cap) never died, so they
+    # placed strictly above everyone who did -- including players who died on the
+    # final, game-ending tick. tick+1 keeps multiple cap-survivors tied with each
+    # other but above all deaths.
+    for q in range(n):
+        if death_tick[q] is None:
+            death_tick[q] = tick + 1
+
+    if verbose:
+        print(f"[battle] finished after {tick} ticks, death_ticks={death_tick}")
+    return death_tick
+
+
 def battle_series(configs, games, base_seed=0, verbose=False):
     """Play `games` battles and tally wins per config index (-1 == draws)."""
     wins = {q: 0 for q in range(len(configs))}
@@ -84,9 +140,9 @@ if __name__ == "__main__":
     # Demo: an aggressive deep-search config vs. a shallow cheap one vs. a
     # variance-averse one.
     demo_configs = [
-        dict(num_sims=300, max_depth=60, W_WIN=10.0, W_LOSS=10.0, K=0.0, DIR_PERSIST=0.0),
-        dict(num_sims=50, max_depth=20, W_WIN=10.0, W_LOSS=10.0, K=0.0, DIR_PERSIST=0.0),
-        dict(num_sims=200, max_depth=50, W_WIN=10.0, W_LOSS=10.0, K=1.0, DIR_PERSIST=0.0),
+        dict(num_sims=300, max_depth=60, W_WIN=10.0, W_LOSS=10.0, K=0.0, W_PLAYERS=0.0, W_FREE=1.0),
+        dict(num_sims=50, max_depth=20, W_WIN=10.0, W_LOSS=10.0, K=0.0, W_PLAYERS=0.0, W_FREE=1.0),
+        dict(num_sims=200, max_depth=50, W_WIN=10.0, W_LOSS=10.0, K=1.0, W_PLAYERS=0.0, W_FREE=1.0),
     ]
     tally = battle_series(demo_configs, games=10, base_seed=0)
     print("win tally (index -> wins, -1 == draw):", tally)
